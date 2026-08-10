@@ -11,6 +11,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Area, Section, SourceBadge, Text } from "@/components/Field";
+import AdvertiserPicker from "./AdvertiserPicker";
+import DangerZone from "@/components/DangerZone";
 import { LIMITS } from "@/lib/venta/limits";
 import type { Deck, Research } from "@/lib/venta/types";
 
@@ -60,10 +62,16 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
     [project.slug, research, deck]
   );
 
-  const scrape = useCallback(async () => {
+  /* adPageId llega cuando corriges el anunciante en el desambiguador: obliga a
+     releer la Ad Library por ese page_id en vez del que se adivinó. */
+  const scrape = useCallback(async (adPageId?: string) => {
     setBusy("scrape");
     setMsg(null);
-    const res = await fetch(`/api/venta/${project.slug}/scrape`, { method: "POST" });
+    const res = await fetch(`/api/venta/${project.slug}/scrape`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(adPageId ? { adPageId } : {}),
+    });
     const data = await res.json().catch(() => ({}));
     setBusy(null);
     if (!res.ok) return setMsg({ kind: "error", text: data.error || "Falló la búsqueda." });
@@ -160,7 +168,7 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="btn btn-ghost" onClick={scrape} disabled={busy !== null}>
+          <button type="button" className="btn btn-ghost" onClick={() => scrape()} disabled={busy !== null}>
             {busy === "scrape" ? "Buscando…" : "Buscar datos"}
           </button>
           <button type="button" className="btn btn-ghost" onClick={writeCopy} disabled={busy !== null}>
@@ -270,6 +278,16 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
                 Abrir la Ad Library de esta marca ↗
               </a>
             )}
+
+            <AdvertiserPicker
+              brand={project.brand}
+              currentPageId={research.adPageId}
+              disabled={busy !== null}
+              onPick={(pageId) => {
+                patch({ adPageId: pageId });
+                void scrape(pageId);
+              }}
+            />
           </Section>
 
           <ProfileSection
@@ -344,6 +362,14 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
           </Section>
 
           <DeckSection deck={deck} onChange={setDeck} />
+
+          <DangerZone
+            slug={project.slug}
+            kind="venta"
+            brand={project.brand}
+            status={status}
+            onUnpublished={() => setStatus("draft")}
+          />
         </div>
 
         {/* ── Preview ── */}

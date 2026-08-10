@@ -117,6 +117,9 @@ migrations/                  SQL, se aplican con npm run migrate
 
 ## Notas de estilo
 
-La tabla `style_notes` pesa **más** que las reglas base del prompt: es lo último
-que aprendió el equipo sobre cómo debe sonar el copy. Se leen antes de cada
-generación, igual que hacía el `style-notes.md` de `research-pitch`.
+`/ajustes/estilo`. Son las correcciones del equipo sobre cómo debe sonar el
+copy, y pesan **más** que las reglas base del prompt: se pegan al final del
+system prompt y ganan si contradicen algo anterior. Es lo mismo que hacía el
+`style-notes.md` de `research-pitch`, pero en DB y editable por cualquiera.
+
+Aplican desde la siguiente generación; no reescriben lo ya publicado.

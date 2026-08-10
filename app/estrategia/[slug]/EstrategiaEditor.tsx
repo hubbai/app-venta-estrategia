@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Area, Section, Text } from "@/components/Field";
 import CreatorPicker from "./CreatorPicker";
+import DangerZone from "@/components/DangerZone";
 import type { Escenario, Estrategia, Funcion, Linea, Panel, Paso, Row } from "@/lib/estrategia/types";
 
 type Props = {
@@ -381,6 +382,14 @@ export default function EstrategiaEditor({ project, initial, sourceDocUrl, publi
             <Area label="Nota de la sección" rows={2} value={e.creadoresNote} onChange={(v) => set("creadoresNote", v)} />
             <CreatorPicker selected={e.creadores} onChange={(v) => set("creadores", v)} enabled={creadoresDisponibles} />
           </Section>
+
+          <DangerZone
+            slug={project.slug}
+            kind="estrategia"
+            brand={project.brand}
+            status={status}
+            onUnpublished={() => setStatus("draft")}
+          />
         </div>
 
         {/* ── Preview ── */}

@@ -21,6 +21,9 @@ export default async function AppHeader() {
           <Link href="/estrategia" className="text-fg-muted hover:text-fg">
             Estrategias
           </Link>
+          <Link href="/ajustes/estilo" className="text-fg-muted hover:text-fg">
+            Estilo
+          </Link>
           {session?.role === "admin" && (
             <Link href="/equipo" className="text-fg-muted hover:text-fg">
               Equipo
