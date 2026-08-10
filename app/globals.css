@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+/* ── Design tokens — misma paleta que full.hubb.mx, para que lo que se ve
+   dentro de la app y lo que se publica en /r/ sean la misma marca.
+   Ámbar #f9b431 = RELLENOS (botones, badges). Periwinkle = TEXTO de acento
+   (el ámbar no tiene contraste suficiente sobre blanco). ────────────────── */
+@theme {
+  --color-ink: #fffdf9;          /* fondo de página (blanco cálido) */
+  --color-surface: #faf7f0;      /* cards / panels (crema) */
+  --color-surface-2: #f2efe5;    /* panels anidados */
+  --color-line: rgba(26, 20, 10, 0.10);
+  --color-line-strong: rgba(26, 20, 10, 0.20);
+
+  --color-fg: #1a160e;
+  --color-fg-muted: #5c564a;
+  --color-fg-faint: #918b7d;
+
+  --color-acid: #f9b431;         /* ámbar — rellenos */
+  --color-acid-dim: #e5a52c;
+  --color-iris: #5360a5;         /* periwinkle — texto de acento */
+  --color-on-accent: #1f1708;
+  --color-danger: #e5675e;
+  --color-ok: #1f9254;
+
+  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-bricolage), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Highlight de marca: el subrayado ámbar de los títulos. */
+.hl {
+  background-color: color-mix(in srgb, var(--color-acid) 42%, white);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0.02em 0.26em;
+  border-radius: 0.2em;
+  color: var(--color-fg);
+  font-weight: 800;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  color: var(--color-iris);
+}
+
+/* ── Primitivas de formulario ──────────────────────────────────────────
+   La app es 90% formularios largos; centralizarlas evita repetir 12 clases
+   de Tailwind en cada input y mantiene el foco consistente. */
+.field {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
+  color: var(--color-fg);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field::placeholder {
+  color: var(--color-fg-faint);
+}
+.field:focus {
+  outline: none;
+  border-color: var(--color-acid-dim);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-acid) 28%, transparent);
+}
+.field:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: filter 0.15s, background-color 0.15s, transform 0.15s;
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--color-acid);
+  color: var(--color-on-accent);
+}
+.btn-primary:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--color-fg-muted);
+  border: 1px solid var(--color-line);
+}
+.btn-ghost:not(:disabled):hover {
+  background: var(--color-surface-2);
+}
+
+.card {
+  border-radius: 1rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
