@@ -9,7 +9,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import postgres from "postgres";
 import bcrypt from "bcryptjs";
-import { pgOptions } from "../lib/pg-options.mjs";
+import { pgOptions, preparedStatements, sslFor } from "../lib/pg-options.mjs";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
@@ -42,6 +42,21 @@ const url = `postgres://postgres@127.0.0.1:${PORT}/postgres`;
 const sql = postgres(url, pgOptions(url, { max: 1 }));
 
 try {
+  // ── Opciones de conexión ────────────────────────────────────────────
+  // Se prueban con las URLs que de verdad da Supabase, porque equivocarse
+  // aquí no falla al conectar: falla intermitente y en producción.
+  const SUPA_TX = "postgresql://postgres.abcd:pw@aws-0-us-east-1.pooler.supabase.com:6543/postgres";
+  const SUPA_SESSION = "postgresql://postgres.abcd:pw@aws-0-us-east-1.pooler.supabase.com:5432/postgres";
+  const SUPA_DIRECT = "postgresql://postgres:pw@db.abcd.supabase.co:5432/postgres";
+
+  check("pooler de Supabase en modo transacción → sin prepared statements", preparedStatements(SUPA_TX) === false);
+  check("pooler en modo sesión → con prepared statements", preparedStatements(SUPA_SESSION) === true);
+  check("conexión directa → con prepared statements", preparedStatements(SUPA_DIRECT) === true);
+  check("?pgbouncer=true también los desactiva", preparedStatements(`${SUPA_SESSION}?pgbouncer=true`) === false);
+  check("Supabase siempre con SSL", sslFor(SUPA_TX) === "require" && sslFor(SUPA_DIRECT) === "require");
+  check("local sin SSL", sslFor("postgres://postgres@127.0.0.1:5432/postgres") === false);
+  check("sslmode=disable explícito manda", sslFor("postgres://u@algo.supabase.com:5432/db?sslmode=disable") === false);
+
   // ── Migración ──────────────────────────────────────────────────────
   const files = fs.readdirSync(path.join(ROOT, "migrations")).filter((f) => f.endsWith(".sql")).sort();
   for (const f of files) {
@@ -196,6 +211,45 @@ try {
 
   const survivor = await sql`select 1 from users where id = ${user.id}`;
   check("…pero no se lleva al usuario que lo creó", survivor.length === 1);
+
+  // ── Otra vez, pero sin prepared statements ──────────────────────────
+  // Así es como corre en el pooler de Supabase. Se repiten las operaciones
+  // sensibles al protocolo (jsonb, transacción, fragmentos) para comprobar
+  // que no dependen de statements preparados.
+  // El socket de PGlite atiende un cliente a la vez, así que hay que soltar
+  // el primero antes de abrir el segundo.
+  await sql.end();
+  const plain = postgres(url, pgOptions(url, { max: 1, prepare: false }));
+  try {
+    const [p2] = await plain`
+      insert into projects (slug, brand, kind, created_by)
+      values ('sin-prepare', 'OTRA', 'venta', ${user.id}) returning *
+    `;
+    await plain`
+      insert into research (project_id, data) values (${p2.id}, ${plain.json({ research: { adCount: 7 } })})
+      on conflict (project_id) do update set data = excluded.data
+    `;
+    const [{ data: d2 }] = await plain`select data from research where project_id = ${p2.id}`;
+    check("sin prepare: el jsonb sigue funcionando", d2.research.adCount === 7);
+
+    await plain.begin(async (tx) => {
+      await tx`insert into renders (project_id, html) values (${p2.id}, '<html>x</html>')
+               on conflict (project_id) do update set html = excluded.html`;
+      await tx`update projects set status='published', published_at=now() where id = ${p2.id}`;
+    });
+    const [pub2] = await plain`
+      select r.html from renders r join projects p on p.id = r.project_id
+      where p.slug = 'sin-prepare' and p.status = 'published'
+    `;
+    check("sin prepare: la transacción de publicar sigue funcionando", pub2?.html === "<html>x</html>");
+
+    const filtered = await plain`
+      select p.* from projects p ${plain`where p.kind = ${"venta"}`} order by p.updated_at desc
+    `;
+    check("sin prepare: los fragmentos condicionales siguen funcionando", filtered.length >= 1);
+  } finally {
+    await plain.end();
+  }
 } catch (err) {
   console.error("\n✗ Reventó:", err.message);
   fails++;

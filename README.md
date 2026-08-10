@@ -33,14 +33,34 @@ npm run db:check    # corre la migración y un round-trip contra Postgres en WAS
 
 `db:check` no necesita Docker ni una base instalada: levanta un Postgres real
 (PGlite) en memoria, aplica las migraciones y verifica el esquema, el jsonb, la
-transacción de publicar y los borrados en cascada. Vale la pena correrlo después
-de tocar `migrations/` o `lib/projects.ts`.
+transacción de publicar y los borrados en cascada. Repite las operaciones
+sensibles al protocolo con los prepared statements apagados, que es como corre
+en el pooler de Supabase. Vale la pena correrlo después de tocar `migrations/`
+o `lib/projects.ts`.
+
+## Sobre la conexión a Supabase
+
+La app usa el driver `postgres` directo, no el SDK de Supabase: la base es solo
+Postgres y así el proyecto no depende de nada de hubb más que del endpoint de
+creadores.
+
+Un detalle que muerde: el **transaction pooler** de Supabase (puerto `6543`) no
+soporta prepared statements, y `postgres.js` los usa por default. El síntoma es
+un `prepared statement "s1" does not exist` intermitente, que aparece bajo carga
+y no en la primera prueba. [lib/pg-options.mjs](lib/pg-options.mjs) detecta el
+puerto y los apaga solo; también respeta `?pgbouncer=true`.
+
+| Connection string | Cuándo | Prepared statements |
+|---|---|---|
+| Transaction pooler `:6543` | **Vercel** (serverless) | apagados, automático |
+| Session pooler `:5432` | scripts largos, migraciones | encendidos |
+| Directa `db.<ref>.supabase.co` | solo desde tu máquina (es IPv6) | encendidos |
 
 ## Variables
 
 | Variable | Para qué | ¿Obligatoria? |
 |---|---|---|
-| `DATABASE_URL` | Postgres (Neon). Todo lo demás se guarda aquí. | **Sí** |
+| `DATABASE_URL` | Postgres de Supabase. Todo se guarda aquí. | **Sí** |
 | `AUTH_SECRET` | Firma la cookie de sesión. `openssl rand -base64 48` | **Sí** |
 | `BLOB_READ_WRITE_TOKEN` | Creativos, miniaturas, screenshots y el doc de Henry | Sí para imágenes |
 | `ANTHROPIC_API_KEY` | Copy del pitch y lectura del documento de estrategia | Recomendada |
