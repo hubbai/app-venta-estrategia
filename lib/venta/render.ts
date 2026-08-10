@@ -325,11 +325,13 @@ ${FONT_LINK}
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(i - 1); } });
   document.getElementById('stage').addEventListener('click', function(e){
     if (e.target.closest('nav')) return; go(i + 1 >= slides.length ? 0 : i + 1); });
-  var start = parseInt((location.hash || '').replace('#', ''), 10);
-  if (start >= 1 && start <= slides.length) go(start - 1);
   function fit(){ var s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
     document.getElementById('deck').style.transform = 'scale(' + s + ')'; }
-  window.addEventListener('resize', fit); fit(); go(0);
+  window.addEventListener('resize', fit); fit();
+  /* Un solo go() al arrancar: pinta el contador y respeta el #2 de la URL.
+     Si se llamara go(0) despues, el deep link quedaria muerto. */
+  var start = parseInt((location.hash || '').replace('#', ''), 10);
+  go(start >= 1 && start <= slides.length ? start - 1 : 0);
 </script>
 </body>
 </html>`;
