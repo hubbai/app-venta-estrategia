@@ -27,6 +27,15 @@ npm run dev                    # http://localhost:3000
 
 Con el usuario admin puedes dar de alta al resto del equipo desde `/equipo`.
 
+```bash
+npm run db:check    # corre la migración y un round-trip contra Postgres en WASM
+```
+
+`db:check` no necesita Docker ni una base instalada: levanta un Postgres real
+(PGlite) en memoria, aplica las migraciones y verifica el esquema, el jsonb, la
+transacción de publicar y los borrados en cascada. Vale la pena correrlo después
+de tocar `migrations/` o `lib/projects.ts`.
+
 ## Variables
 
 | Variable | Para qué | ¿Obligatoria? |

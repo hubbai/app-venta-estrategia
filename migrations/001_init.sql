@@ -4,7 +4,7 @@
 -- publicado se congela en renders para que /r/{slug} nunca dependa de que el
 -- render actual siga produciendo lo mismo.
 
-create extension if not exists pgcrypto;
+-- gen_random_uuid() es core desde Postgres 13, así que no hace falta pgcrypto.
 
 create table if not exists users (
   id            uuid primary key default gen_random_uuid(),

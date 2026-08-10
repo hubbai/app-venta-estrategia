@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
-    "seed:user": "node --env-file-if-exists=.env.local scripts/seed-user.mjs"
+    "seed:user": "node --env-file-if-exists=.env.local scripts/seed-user.mjs",
+    "db:check": "node scripts/db-check.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -21,6 +22,8 @@
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "@electric-sql/pglite-socket": "^0.2.7",
     "@tailwindcss/postcss": "4.3.0",
     "@types/node": "22.10.7",
     "@types/react": "19.0.7",
