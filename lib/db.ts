@@ -9,6 +9,7 @@
    recolectar rutas y no queremos que reviente por no tener DATABASE_URL en el
    entorno de build. */
 import postgres, { type Sql } from "postgres";
+import { pgOptions } from "./pg-options.mjs";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -24,13 +25,7 @@ function client_(): Sql {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("Falta DATABASE_URL. Copia .env.example a .env.local.");
 
-  client = postgres(url, {
-    ssl: url.includes("localhost") ? false : "require",
-    // Serverless: pocas conexiones por instancia y que se suelten rápido.
-    max: 5,
-    idle_timeout: 20,
-    connect_timeout: 10,
-  });
+  client = postgres(url, pgOptions(url));
 
   /* En dev, Next recarga los módulos en cada cambio; sin el global se abriría
      un pool nuevo por recarga hasta agotar las conexiones de Neon. */

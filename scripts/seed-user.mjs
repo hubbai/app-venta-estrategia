@@ -6,6 +6,7 @@
 
    Uso:  npm run seed:user -- hola@hubb.mx 'unaContraseña' 'Marcelo Garza' admin */
 import postgres from "postgres";
+import { pgOptions } from "../lib/pg-options.mjs";
 import bcrypt from "bcryptjs";
 
 const [email, password, name, role = "member"] = process.argv.slice(2);
@@ -29,7 +30,7 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = postgres(url, { ssl: url.includes("localhost") ? false : "require", max: 1 });
+const sql = postgres(url, pgOptions(url, { max: 1 }));
 
 try {
   const hash = await bcrypt.hash(password, 12);

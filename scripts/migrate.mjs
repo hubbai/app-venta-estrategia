@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import { pgOptions } from "../lib/pg-options.mjs";
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "migrations");
 
@@ -18,7 +19,7 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = postgres(url, { ssl: url.includes("localhost") ? false : "require", max: 1 });
+const sql = postgres(url, pgOptions(url, { max: 1 }));
 
 try {
   await sql`create table if not exists _migrations (
