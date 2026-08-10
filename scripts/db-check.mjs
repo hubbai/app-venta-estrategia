@@ -9,12 +9,24 @@ import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import postgres from "postgres";
 import bcrypt from "bcryptjs";
+import { pgOptions } from "../lib/pg-options.mjs";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PORT = 5433;
+
+/* Puerto efímero en vez de uno fijo: si tienes un Postgres propio corriendo,
+   esto no choca con él ni te obliga a apagarlo. */
+const PORT = await new Promise((resolve, reject) => {
+  const probe = net.createServer();
+  probe.once("error", reject);
+  probe.listen(0, "127.0.0.1", () => {
+    const { port } = probe.address();
+    probe.close(() => resolve(port));
+  });
+});
 
 let fails = 0;
 function check(name, cond, detail) {
@@ -26,7 +38,8 @@ const db = await PGlite.create();
 const server = new PGLiteSocketServer({ db, port: PORT, host: "127.0.0.1" });
 await server.start();
 
-const sql = postgres(`postgres://postgres@127.0.0.1:${PORT}/postgres`, { ssl: false, max: 1 });
+const url = `postgres://postgres@127.0.0.1:${PORT}/postgres`;
+const sql = postgres(url, pgOptions(url, { max: 1 }));
 
 try {
   // ── Migración ──────────────────────────────────────────────────────
