@@ -18,6 +18,14 @@ import { mirror } from "../blob";
 import type { Ad, Clip, Profile, Research } from "../venta/types";
 
 type Sources = NonNullable<Research["sources"]>;
+type Errors = NonNullable<Research["sourceErrors"]>;
+
+/* Cada bloque anota aquí por qué se quedó vacío. "Account doesn't exist" es
+   accionable —el handle está mal escrito—; "falló" a secas no lo es. */
+function anota(errors: Errors, bloque: string, err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  errors[bloque] = msg || "Error desconocido.";
+}
 
 export type ScrapeInput = {
   slug: string;
@@ -32,22 +40,20 @@ export type ScrapeInput = {
 
 export async function runScrape(input: ScrapeInput): Promise<Partial<Research>> {
   const sources: Sources = {};
+  const errors: Errors = {};
   const query = (input.searchQuery || input.brand).trim();
 
   const [ads, ig, tt, ttVideos, search] = await Promise.all([
-    scrapeAds(input, sources),
-    input.instagramHandle ? scrapeInstagram(input, sources) : null,
-    input.tiktokHandle ? scrapeTiktokProfile(input, sources) : null,
-    input.tiktokHandle ? scrapeTiktokVideos(input, sources) : null,
-    scrapeSearch(input.slug, query, sources),
+    scrapeAds(input, sources, errors),
+    input.instagramHandle ? scrapeInstagram(input, sources, errors) : null,
+    input.tiktokHandle ? scrapeTiktokProfile(input, sources, errors) : null,
+    input.tiktokHandle ? scrapeTiktokVideos(input, sources, errors) : null,
+    scrapeSearch(input.slug, query, sources, errors),
   ]);
 
   const ownClips = ttVideos ?? [];
-  // De la búsqueda, lo que NO es de la cuenta de la marca son creadores.
   const own = (input.tiktokHandle || "").replace(/^@/, "").toLowerCase();
-  const creatorClips = (search?.results ?? [])
-    .filter((c) => (c.author || "").toLowerCase() !== own)
-    .slice(0, 2);
+  const creatorClips = (search?.results ?? []).filter((c) => !esDeLaMarca(c.author, own, input.brand)).slice(0, 2);
 
   const bestOwn = ownClips[0]?.viewsNum ?? 0;
   const bestCreator = creatorClips[0]?.viewsNum ?? 0;
@@ -66,12 +72,13 @@ export async function runScrape(input: ScrapeInput): Promise<Partial<Research>> 
     ownViews: ownClips[0]?.views,
     scrapedAt: new Date().toISOString(),
     sources,
+    sourceErrors: errors,
   };
 }
 
 /* ── Paid media ──────────────────────────────────────────────────────── */
 
-async function scrapeAds(input: ScrapeInput, sources: Sources): Promise<Partial<Research>> {
+async function scrapeAds(input: ScrapeInput, sources: Sources, errors: Errors): Promise<Partial<Research>> {
   try {
     let pageId = input.adPageId;
     if (!pageId) {
@@ -79,6 +86,7 @@ async function scrapeAds(input: ScrapeInput, sources: Sources): Promise<Partial<
       pageId = companies[0]?.page_id;
       if (!pageId) {
         sources.ads = "fallo";
+        errors.ads = `No hay ningún anunciante llamado "${input.brand}" en la Ad Library de México.`;
         return { adCount: 0, ads: [] };
       }
     }
@@ -116,6 +124,7 @@ async function scrapeAds(input: ScrapeInput, sources: Sources): Promise<Partial<
   } catch (err) {
     console.error("[scrape:ads]", err);
     sources.ads = "fallo";
+    anota(errors, "ads", err);
     return { adCount: 0, ads: [] };
   }
 }
@@ -171,7 +180,7 @@ function fmtDate(epochSeconds: number): string {
 
 /* ── Orgánico ────────────────────────────────────────────────────────── */
 
-async function scrapeInstagram(input: ScrapeInput, sources: Sources): Promise<Profile | null> {
+async function scrapeInstagram(input: ScrapeInput, sources: Sources, errors: Errors): Promise<Profile | null> {
   try {
     const raw = await instagramProfile(input.instagramHandle!);
     const u = raw.data?.user;
@@ -192,11 +201,12 @@ async function scrapeInstagram(input: ScrapeInput, sources: Sources): Promise<Pr
   } catch (err) {
     console.error("[scrape:instagram]", err);
     sources.instagram = "fallo";
+    anota(errors, "instagram", err);
     return null;
   }
 }
 
-async function scrapeTiktokProfile(input: ScrapeInput, sources: Sources): Promise<Profile | null> {
+async function scrapeTiktokProfile(input: ScrapeInput, sources: Sources, errors: Errors): Promise<Profile | null> {
   try {
     const raw = await tiktokProfile(input.tiktokHandle!);
     const u = raw.user;
@@ -217,11 +227,12 @@ async function scrapeTiktokProfile(input: ScrapeInput, sources: Sources): Promis
   } catch (err) {
     console.error("[scrape:tiktok]", err);
     sources.tiktok = "fallo";
+    anota(errors, "tiktok", err);
     return null;
   }
 }
 
-async function scrapeTiktokVideos(input: ScrapeInput, sources: Sources): Promise<Clip[] | null> {
+async function scrapeTiktokVideos(input: ScrapeInput, sources: Sources, errors: Errors): Promise<Clip[] | null> {
   try {
     const raw = await tiktokProfileVideos(input.tiktokHandle!);
     const top = sortByViews(raw).slice(0, 2);
@@ -230,6 +241,7 @@ async function scrapeTiktokVideos(input: ScrapeInput, sources: Sources): Promise
   } catch (err) {
     console.error("[scrape:videos]", err);
     sources.videos = "fallo";
+    anota(errors, "videos", err);
     return null;
   }
 }
@@ -237,7 +249,8 @@ async function scrapeTiktokVideos(input: ScrapeInput, sources: Sources): Promise
 async function scrapeSearch(
   slug: string,
   query: string,
-  sources: Sources
+  sources: Sources,
+  errors: Errors
 ): Promise<{ query: string; results: Clip[] } | null> {
   try {
     const raw = await tiktokKeywordSearch(query);
@@ -247,8 +260,32 @@ async function scrapeSearch(
   } catch (err) {
     console.error("[scrape:search]", err);
     sources.busqueda = "fallo";
+    anota(errors, "busqueda", err);
     return null;
   }
+}
+
+/* ¿Ese video del buscador es de la marca disfrazada de creador?
+
+   La slide 3 afirma que los primeros resultados los subió gente que NO trabaja
+   con la marca. Si ahí se cuela una cuenta secundaria de la propia marca, la
+   afirmación es falsa y se dice en voz alta frente al cliente. Comparar solo
+   contra el handle configurado no basta: RESILIENT es @rslnt_mx en TikTok, pero
+   su otra cuenta es @resilientclub1.
+
+   Se descarta al autor cuyo handle contenga el nombre de la marca ya
+   normalizado. Es estrecho a propósito: para RESILIENT saca a
+   "resilientclub1" y deja pasar "resilienciaclub", que no lo contiene. Si de
+   todos modos se cuela algo, se quita desde el editor. */
+function esDeLaMarca(author: string | undefined, ownHandle: string, brand: string): boolean {
+  const a = (author || "").toLowerCase();
+  if (!a) return false;
+  if (a === ownHandle) return true;
+
+  const key = brand.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Marcas de nombre muy corto darían falsos positivos por todos lados.
+  if (key.length < 5) return false;
+  return a.replace(/[^a-z0-9]/g, "").includes(key);
 }
 
 function sortByViews(list: RawTtVideo[]): RawTtVideo[] {

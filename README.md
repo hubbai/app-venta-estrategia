@@ -82,7 +82,16 @@ copy más plano) y la estrategia no se puede parsear. Sin
    - **Instagram** y **TikTok**: seguidores, bio, foto y los mejores videos con
      sus views.
    - **Buscador de TikTok**: qué sale cuando alguien busca la marca. De ahí se
-     separan los videos de creadores externos de los de la marca.
+     separan los videos de creadores externos de los de la marca —y se descartan
+     las cuentas secundarias de la propia marca, porque la slide 3 afirma que
+     ese contenido lo subió gente de fuera y sería falso decirlo frente al
+     cliente.
+
+   Si el nombre de la marca es una palabra común, la búsqueda trae ruido:
+   "resilient" devuelve videos de motivación. Cambia el término por algo más
+   específico ("resilient club") y vuelve a correrla. Cuando un bloque falla, el
+   editor dice por qué; casi siempre es un handle mal escrito, y ScrapeCreators
+   responde eso con un **200**, no con un 404.
 3. Revisas y corriges todo en el editor. Cada bloque dice si se trajo solo, si
    falló o si lo pusiste a mano. Si algo no se pudo, subes la captura.
 4. **Escribir copy** — Claude arma los textos de las 3 slides respetando los

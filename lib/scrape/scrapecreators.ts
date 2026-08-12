@@ -52,7 +52,17 @@ async function get<T>(path: string, params: Record<string, string | number | und
     throw new ScrapeError(hint || `ScrapeCreators respondió ${res.status}`, res.status);
   }
 
-  return (await res.json()) as T;
+  const json = (await res.json()) as T & { error?: string; message?: string; errorStatus?: number };
+
+  /* Un handle que no existe NO devuelve 404: devuelve 200 con success:true y el
+     error adentro del cuerpo. Si no se revisa aquí, el bloque falla más abajo
+     con un "no devolvió el perfil" que suena a que el scraper está roto, cuando
+     lo que pasa es que la cuenta está mal escrita. */
+  if (typeof json?.error === "string" && json.error) {
+    throw new ScrapeError(json.message || json.error, json.errorStatus);
+  }
+
+  return json as T;
 }
 
 /* ── Meta Ad Library ─────────────────────────────────────────────────── */

@@ -78,6 +78,9 @@ export type Research = {
   scrapedAt?: string;
   /* Qué bloques se trajeron solos y cuáles fallaron, para avisarte en el form. */
   sources?: Record<string, "ok" | "fallo" | "manual">;
+  /* Por qué falló cada bloque, en palabras. Se guarda junto con el research
+     para que al volver al editor mañana siga explicando el hueco. */
+  sourceErrors?: Record<string, string>;
 };
 
 /* El copy que escribe Claude. 3 slides. */

@@ -82,9 +82,17 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
     const failed = Object.entries((data.sources ?? {}) as Record<string, string>)
       .filter(([, v]) => v === "fallo")
       .map(([k]) => k);
+    // Con el motivo, no solo el bloque: casi siempre es un handle mal escrito,
+    // y "Account doesn't exist" se arregla solo con leerlo.
+    const why = (data.research?.sourceErrors ?? {}) as Record<string, string>;
     setMsg(
       failed.length
-        ? { kind: "error", text: `Se trajo lo demás, pero falló: ${failed.join(", ")}. Llénalo a mano abajo.` }
+        ? {
+            kind: "error",
+            text: `Se trajo lo demás. Falló ${failed
+              .map((k) => (why[k] ? `${k} (${why[k]})` : k))
+              .join("; ")}. Llénalo a mano abajo.`,
+          }
         : { kind: "ok", text: "Datos actualizados." }
     );
   }, [project.slug]);
