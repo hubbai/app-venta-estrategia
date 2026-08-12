@@ -122,11 +122,26 @@ El índice `/r` de `full_service` suma lo publicado aquí vía
 
 ## El endpoint de creadores en hubb
 
-`hubb/app/api/external/creators/search/route.ts`. Auth por
-`Authorization: Bearer ${EXTERNAL_API_TOKEN}` — no por sesión, para que se pueda
-llamar desde fuera. Solo lectura, solo creadores aprobados y activos, y solo
-campos de vitrina (los mismos que ya son públicos en `/portfolio/[creatorId]`):
-nada de correo ni datos de pago.
+`GET https://www.hubb.mx/api/external/creators`, que hubb ya tenía para
+integraciones. Auth por `Authorization: Bearer ${HUBB_API_TOKEN}`, donde el
+token es una fila de `integration_tokens` con scope `creators.read` y nada más
+—revocable y auditada desde hubb, sin secreto global compartido—. Solo lectura,
+solo creadores aprobados y no suspendidos, y solo campos de vitrina: nada de
+correo ni teléfono ni datos de pago.
+
+Tres detalles que muerden:
+
+- **El `www` no es opcional.** `hubb.mx` redirige (307) al `www` y, como es otro
+  origen, el redirect descarta el `Authorization`. Un token válido daría 401.
+  `hubbBase()` reescribe el apex solo, por si alguien lo configura sin `www`.
+- **El país lo pone el token**, no la query: el endpoint filtra por el país del
+  workspace dueño del token (México), así que el catálogo ya llega acotado.
+- **El orden es aleatorio con semilla.** Para paginar hay que reenviar la misma
+  `seed` con el `offset`, o "Cargar más" repetiría creadores. `limit` topa en 50.
+
+De la fila que devuelve, `creator_categories[].category.name` son las categorías
+buenas —la columna suelta `categories` casi siempre viene null— y los handles a
+veces llegan como URL completa. [lib/hubb.ts](lib/hubb.ts) normaliza las dos cosas.
 
 ## Estructura
 

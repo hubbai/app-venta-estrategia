@@ -17,16 +17,20 @@ export async function GET(req: Request) {
     const p = new URL(req.url).searchParams;
     const num = (k: string) => (p.get(k) ? Number(p.get(k)) : undefined);
 
-    const creators = await searchHubbCreators({
+    const page = await searchHubbCreators({
       q: p.get("q") ?? undefined,
       category: p.get("category") ?? undefined,
-      location: p.get("location") ?? undefined,
+      state: p.get("state") ?? undefined,
       minFollowers: num("minFollowers"),
       maxFollowers: num("maxFollowers"),
-      limit: num("limit") ?? 40,
+      limit: num("limit"),
+      offset: num("offset"),
+      // Sin semilla el orden se rebaraja en cada request y "Cargar más" repetiría
+      // o se saltaría creadores; el cliente la reenvía tal cual.
+      seed: p.get("seed") ?? undefined,
     });
 
-    return Response.json({ creators });
+    return Response.json(page);
   } catch (err) {
     return apiError(err);
   }

@@ -57,25 +57,38 @@ export default function CreatorPicker({
   enabled: boolean;
 }) {
   const [q, setQ] = useState("");
-  const [location, setLocation] = useState("");
+  const [state, setState] = useState("");
   const [results, setResults] = useState<HubbCreator[] | null>(null);
+  const [page, setPage] = useState<{ total: number; hasMore: boolean; seed: string }>({
+    total: 0,
+    hasMore: false,
+    seed: "",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const chosen = new Set(selected.map((c) => c.id));
 
-  async function search(e?: React.FormEvent) {
-    e?.preventDefault();
+  /* `more` decide si esto es una búsqueda nueva o la siguiente página. hubb
+     ordena al azar con semilla, así que paginar exige reenviar la misma semilla
+     y el offset; sin eso saldrían repetidos. */
+  async function search(more = false) {
     setBusy(true);
     setError(null);
     const params = new URLSearchParams();
     if (q) params.set("q", q);
-    if (location) params.set("location", location);
+    if (state) params.set("state", state);
+    if (more) {
+      params.set("offset", String(results?.length ?? 0));
+      if (page.seed) params.set("seed", page.seed);
+    }
     const res = await fetch(`/api/creadores?${params}`);
     const data = await res.json().catch(() => ({}));
     setBusy(false);
     if (!res.ok) return setError(data.error || "No se pudo buscar en hubb.");
-    setResults(data.creators ?? []);
+    const batch: HubbCreator[] = data.creators ?? [];
+    setResults(more ? [...(results ?? []), ...batch] : batch);
+    setPage({ total: data.total ?? batch.length, hasMore: Boolean(data.hasMore), seed: data.seed ?? "" });
   }
 
   if (!enabled) {
@@ -151,9 +164,21 @@ export default function CreatorPicker({
       </div>
 
       {/* Buscador */}
-      <form onSubmit={search} className="flex flex-wrap gap-2 border-t border-line pt-5">
-        <input className="field flex-1" placeholder="Nicho o nombre: running, fitness…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <input className="field w-40" placeholder="Ciudad" value={location} onChange={(e) => setLocation(e.target.value)} />
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          search();
+        }}
+        className="flex flex-wrap gap-2 border-t border-line pt-5"
+      >
+        <input
+          className="field flex-1"
+          placeholder="Nicho, nombre o ciudad: running, Monterrey…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        {/* Este filtro es por ESTADO, no por ciudad; la ciudad la agarra el buscador de arriba. */}
+        <input className="field w-40" placeholder="Estado" value={state} onChange={(e) => setState(e.target.value)} />
         <button type="submit" disabled={busy} className="btn btn-ghost">
           {busy ? "Buscando…" : "Buscar en hubb"}
         </button>
@@ -163,7 +188,11 @@ export default function CreatorPicker({
 
       {results && (
         <div>
-          <span className="label">{results.length} resultados</span>
+          <span className="label">
+            {page.total > results.length
+              ? `${results.length} de ${page.total.toLocaleString("es-MX")} resultados`
+              : `${results.length} resultados`}
+          </span>
           {results.length === 0 && <p className="text-xs text-fg-faint">Nada con esos filtros.</p>}
           <div className="grid gap-2 sm:grid-cols-2">
             {results.map((c) => {
@@ -189,6 +218,11 @@ export default function CreatorPicker({
               );
             })}
           </div>
+          {page.hasMore && (
+            <button type="button" onClick={() => search(true)} disabled={busy} className="btn btn-ghost mt-3 w-full">
+              {busy ? "Cargando…" : "Cargar más"}
+            </button>
+          )}
         </div>
       )}
     </div>
