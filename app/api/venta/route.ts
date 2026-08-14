@@ -16,6 +16,8 @@ export async function POST(req: Request) {
       industry?: string;
       instagramHandle?: string;
       tiktokHandle?: string;
+      /* Viene del autocompletado: el anunciante ya identificado. */
+      adPageId?: string;
     };
 
     if (!body.brand?.trim()) {
@@ -27,6 +29,7 @@ export async function POST(req: Request) {
     const research = emptyResearch(project.brand);
     research.site = body.site?.trim();
     research.industry = body.industry?.trim() || "";
+    if (body.adPageId?.trim()) research.adPageId = body.adPageId.trim();
     if (body.instagramHandle?.trim()) research.instagram = { handle: clean(body.instagramHandle) };
     if (body.tiktokHandle?.trim()) research.tiktok = { handle: clean(body.tiktokHandle) };
 

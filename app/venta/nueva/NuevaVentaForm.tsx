@@ -16,6 +16,9 @@ type Form = {
   industry: string;
   instagramHandle: string;
   tiktokHandle: string;
+  /* No se teclea: lo llena el autocompletado para que el research vaya directo
+     a la Ad Library correcta sin pasar por el desambiguador. */
+  adPageId: string;
 };
 
 export default function NuevaVentaForm() {
@@ -26,6 +29,7 @@ export default function NuevaVentaForm() {
     industry: "",
     instagramHandle: "",
     tiktokHandle: "",
+    adPageId: "",
   });
   const [fuentes, setFuentes] = useState<Record<string, string>>({});
   const [aviso, setAviso] = useState<string | null>(null);
@@ -60,6 +64,7 @@ export default function NuevaVentaForm() {
       industry: f.industry || data.industry || "",
       instagramHandle: f.instagramHandle || data.instagramHandle || "",
       tiktokHandle: f.tiktokHandle || data.tiktokHandle || "",
+      adPageId: data.adPageId || f.adPageId,
     }));
     setFuentes(data.fuentes ?? {});
     setAviso(data.aviso ?? null);

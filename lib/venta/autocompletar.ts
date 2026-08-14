@@ -18,7 +18,7 @@
    dejarlo vacío, porque el research se va callado por la cuenta de alguien más
    y el error aparece hasta la llamada. */
 import Anthropic from "@anthropic-ai/sdk";
-import { instagramProfile, scrapeReady, tiktokProfile } from "../scrape/scrapecreators";
+import { companyAds, instagramProfile, scrapeReady, searchCompanies, tiktokProfile } from "../scrape/scrapecreators";
 
 const MODEL = "claude-sonnet-5";
 const TIMEOUT_MS = 15_000;
@@ -28,6 +28,9 @@ export type Autocompletado = {
   industry?: string;
   instagramHandle?: string;
   tiktokHandle?: string;
+  /* Si se identificó al anunciante, se pasa para que el research vaya directo a
+     su Ad Library y no haya que elegirlo después en el desambiguador. */
+  adPageId?: string;
   /* De dónde salió cada cosa, para pintarlo en el formulario. El usuario tiene
      que poder distinguir "esto lo leí de tu página" de "esto lo deduje". */
   fuentes: Record<string, string>;
@@ -119,6 +122,107 @@ async function leerMarca(sitio: Sitio, url: string): Promise<{ brand?: string; i
   } catch (err) {
     console.error("[autocompletar:marca]", err);
     return {};
+  }
+}
+
+/* ── 2b. Si la web está cerrada, la Ad Library ───────────────────────── */
+
+/* Los sitios corporativos suelen estar detrás de un escudo antibots: telcel.com
+   contesta 403 a cualquier cosa que no sea un navegador de verdad. Pero esas
+   mismas marcas son anunciantes grandes, y la Ad Library publica su nombre, su
+   giro, su Instagram y sus anuncios activos. Es data que la marca misma puso.
+
+   Se elige por nombre y se desempata por likes de la página: "Telcel" (5.4M
+   likes) contra "Planes Telcel Libre" (1.9K) no tiene discusión. */
+type Anunciante = { pageId: string; name: string; category?: string; ig?: string };
+
+async function desdeAdLibrary(nombre: string): Promise<Anunciante | null> {
+  if (!scrapeReady() || !nombre) return null;
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const objetivo = slug(nombre);
+
+  try {
+    const companies = await searchCompanies(nombre);
+    /* Coincidencia por PALABRA COMPLETA, no por prefijo.
+       "kredi" contra "KreditBee" (una app de préstamos de India) empieza igual,
+       y así fue como una búsqueda de Kredi México devolvió el Instagram de otra
+       empresa. Con palabra completa, "Kredi México" sigue coincidiendo y
+       "KreditBee" ya no. */
+    const puntua = (c: { name?: string; likes?: number }) => {
+      const nombreCompleto = slug(c.name || "");
+      if (nombreCompleto === objetivo) return 3;
+      const primeraPalabra = slug((c.name || "").split(/[\s|·—–-]+/)[0] || "");
+      if (primeraPalabra === objetivo) return 2;
+      return 0;
+    };
+    const mejor = companies
+      .filter((c) => puntua(c) > 0)
+      .sort((a, b) => puntua(b) - puntua(a) || (b.likes ?? 0) - (a.likes ?? 0))[0];
+
+    if (!mejor?.page_id) return null;
+    return { pageId: mejor.page_id, name: mejor.name || nombre, category: mejor.category, ig: mejor.ig_username };
+  } catch (err) {
+    console.error("[autocompletar:adlibrary]", err);
+    return null;
+  }
+}
+
+/* Qué vende, contado con su propia publicidad. No es invención del modelo: son
+   los anuncios que la marca trae corriendo hoy. */
+async function queVendeSegunSusAnuncios(a: Anunciante): Promise<string | undefined> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return a.category;
+
+  let copies: string[] = [];
+  try {
+    const ads = await companyAds({ pageId: a.pageId, country: "MX", status: "ACTIVE" });
+    copies = ads
+      .slice(0, 6)
+      .map((ad) => {
+        const s = (ad.snapshot ?? {}) as Record<string, { text?: string } | undefined>;
+        return String(s.body?.text ?? "").replace(/\s+/g, " ").trim();
+      })
+      .filter(Boolean);
+  } catch {
+    /* Sin anuncios nos quedamos con la categoría, que ya es algo. */
+  }
+
+  try {
+    const anthropic = new Anthropic({ apiKey: key });
+    const res = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 300,
+      system:
+        "Dices qué vende una marca en una línea de menos de 90 caracteres, en español de México, como se lo dirías a un colega. Te basas SOLO en lo que te dan. Si no alcanza para ser específico, sé general pero no inventes precios, canales ni productos que no aparezcan.",
+      tools: [
+        {
+          name: "emit",
+          description: "Entrega la línea.",
+          input_schema: {
+            type: "object" as const,
+            required: ["industry"],
+            properties: { industry: { type: "string" } },
+          },
+        },
+      ],
+      tool_choice: { type: "tool", name: "emit" },
+      messages: [
+        {
+          role: "user",
+          content: `MARCA: ${a.name}
+GIRO SEGÚN FACEBOOK: ${a.category || "no especificado"}
+${copies.length ? `ANUNCIOS QUE TRAE CORRIENDO HOY:\n${copies.map((c) => `- ${c.slice(0, 200)}`).join("\n")}` : "(sin anuncios activos)"}
+
+¿Qué vende?`,
+        },
+      ],
+    });
+    const block = res.content.find((b) => b.type === "tool_use");
+    if (!block || block.type !== "tool_use") return a.category;
+    return (block.input as { industry?: string }).industry || a.category;
+  } catch (err) {
+    console.error("[autocompletar:anuncios]", err);
+    return a.category;
   }
 }
 
@@ -234,40 +338,96 @@ async function buscarHandle(
 
 /* ── Todo junto ──────────────────────────────────────────────────────── */
 
+/* Un modelo al que no le alcanza la información a veces contesta con un
+   marcador en vez de callarse: "<UNKNOWN>", "N/A", "desconocido". Eso no puede
+   llegar al formulario como si fuera un dato. */
+const NO_ES_DATO = /^\s*[<[(]?\s*(unknown|n\/?a|none|null|desconocido|sin (datos?|información))\s*[>\])]?\s*\.?\s*$/i;
+
+function limpio(v?: string): string | undefined {
+  const s = (v || "").trim();
+  if (!s || s.length < 3 || NO_ES_DATO.test(s)) return undefined;
+  return s;
+}
+
+/** "https://www.telcel.com/" → "Telcel". Es la mejor pista cuando no hay nada más. */
+function marcaDelDominio(url: string): string {
+  try {
+    const raiz = new URL(url).hostname.replace(/^www\./, "").split(".")[0];
+    return raiz.charAt(0).toUpperCase() + raiz.slice(1);
+  } catch {
+    return "";
+  }
+}
+
 export async function autocompletar(siteUrl: string): Promise<Autocompletado> {
   const url = normalizaUrl(siteUrl);
   const fuentes: Record<string, string> = {};
+  const avisos: string[] = [];
 
   const sitio = await leerSitio(url);
-  if (!sitio) {
-    return { fuentes, aviso: "No se pudo leer esa página (puede estar bloqueando robots). Llena los campos a mano." };
+
+  let brand: string | undefined;
+  let industry: string | undefined;
+  let anuncios: Anunciante | null = null;
+
+  if (sitio) {
+    const leido = await leerMarca(sitio, url);
+    brand = limpio(leido.brand);
+    industry = limpio(leido.industry);
+    if (brand) fuentes.brand = "leído de tu página";
+    if (industry) fuentes.industry = "leído de tu página";
+  } else {
+    // La web está cerrada: 403 de un escudo antibots, o simplemente caída.
+    avisos.push("Tu página bloquea la lectura automática, así que fui a su Ad Library.");
   }
 
-  const { brand, industry } = await leerMarca(sitio, url);
-  if (brand) fuentes.brand = "leído de tu página";
-  if (industry) fuentes.industry = "leído de tu página";
+  /* La Ad Library entra cuando la web no dio lo suficiente — no solo cuando
+     está caída. Hay sitios que cargan pero no traen descripción (kredi.mx), y
+     ahí los anuncios que la marca trae corriendo dicen mucho más. */
+  if (!brand || !industry) {
+    anuncios = await desdeAdLibrary(brand || marcaDelDominio(url));
+    if (anuncios) {
+      if (!brand) {
+        brand = anuncios.name;
+        fuentes.brand = "según su página de Facebook";
+      }
+      if (!industry) {
+        industry = limpio(await queVendeSegunSusAnuncios(anuncios));
+        if (industry) fuentes.industry = "deducido de sus anuncios activos";
+      }
+    }
+  }
 
-  const marca = { brand: brand || "", industry, site: url };
-  const posibles = brand ? candidatos(brand, url) : candidatos("", url);
+  const marca = { brand: brand || marcaDelDominio(url), industry, site: url };
+  // El IG que publica la Ad Library es de la propia marca: va como candidato fuerte.
+  const igDelSitio = [...(sitio?.ig ?? []), ...(anuncios?.ig ? [anuncios.ig.toLowerCase()] : [])];
+  const posibles = candidatos(marca.brand, url);
 
   const [ig, tt] = await Promise.all([
-    buscarHandle("instagram", sitio.ig, posibles, marca),
-    buscarHandle("tiktok", sitio.tt, posibles, marca),
+    buscarHandle("instagram", igDelSitio, posibles, marca),
+    buscarHandle("tiktok", sitio?.tt ?? [], posibles, marca),
   ]);
-  if (ig.fuente) fuentes.instagramHandle = ig.fuente;
+  if (ig.fuente) fuentes.instagramHandle = anuncios?.ig === ig.handle ? "está en su Ad Library" : ig.fuente;
   if (tt.fuente) fuentes.tiktokHandle = tt.fuente;
 
   const faltan = [!ig.handle && "Instagram", !tt.handle && "TikTok"].filter(Boolean);
+  if (faltan.length) {
+    avisos.push(
+      `No pude confirmar ${faltan.join(" ni ")}: muchas marcas usan abreviaturas (RESILIENT es @rslnt_mx). Prefiero dejarlo vacío a llenarlo con la cuenta de alguien más — escríbelo tú y listo.`
+    );
+  }
+  if (!brand) {
+    avisos.push("Tampoco pude identificar la marca. Todos los campos son editables: llénalos a mano y sigue igual.");
+  }
 
   return {
     brand,
     industry,
     instagramHandle: ig.handle,
     tiktokHandle: tt.handle,
+    adPageId: anuncios?.pageId,
     fuentes,
-    aviso: faltan.length
-      ? `No pude confirmar ${faltan.join(" ni ")}. Muchas marcas usan abreviaturas (RESILIENT es @rslnt_mx), y prefiero dejarlo vacío a llenarlo con la cuenta de alguien más.`
-      : undefined,
+    aviso: avisos.join(" ") || undefined,
   };
 }
 

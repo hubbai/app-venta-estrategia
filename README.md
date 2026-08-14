@@ -125,6 +125,17 @@ decidirlo, con marcas reales:
 | Ad Library por nombre | devuelve homónimos ("Resilient Retail Club", "Resilient Volleyball Club") |
 | Buscador de cuentas de TikTok | 30 resultados globales; una marca de 138 seguidores no aparece |
 
+Cuando la web no alcanza —`telcel.com` contesta 403 detrás de Akamai,
+`kredi.mx` carga pero no trae descripción— se va a la **Ad Library**: ahí la
+marca publica su nombre, su giro, su Instagram y los anuncios que trae
+corriendo, que dicen qué vende mejor que cualquier meta tag. De paso queda
+identificado el anunciante, así que el research se salta el desambiguador.
+
+Ese match es por **palabra completa, nunca por prefijo**: `kredi` contra
+`KreditBee` (una app de préstamos de India) empieza igual, y así una búsqueda de
+Kredi México devolvió el Instagram de otra empresa. Con palabra completa
+`Kredi México` sigue coincidiendo y `KreditBee` ya no.
+
 El patrón: las marcas que nos interesan son chicas y usan abreviaturas
 —RESILIENT es `@rslnt_mx` y `@resilient_tm`— que es justo lo que ningún buscador
 por nombre encuentra. Así que un handle solo se propone si se **verificó** que
