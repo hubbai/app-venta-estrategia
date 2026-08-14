@@ -75,7 +75,9 @@ copy más plano) y la estrategia no se puede parsear. Sin
 
 ## Flujo: llamada de venta
 
-1. `/venta/nueva` — marca, sitio, qué venden y los handles de IG/TikTok.
+1. `/venta/nueva` — pegas la página web y **Llenar solo**: de ahí salen la marca
+   y qué venden. Los handles se proponen solo si se pudieron verificar contra la
+   cuenta real; si no, los pones tú y el formulario te dice por qué.
 2. La app corre el research sola contra ScrapeCreators:
    - **Ad Library**: resuelve el `page_id` del anunciante y trae sus anuncios
      activos con copy, fecha de arranque, creativo y si es video o imagen.
@@ -110,6 +112,27 @@ Las 3 slides, en el orden en que se proyectan:
 Los números de la slide 1 los calcula el render con los datos, no Claude: son
 afirmaciones que se dicen en voz alta frente al cliente y no pueden depender de
 que el modelo cuente bien. Claude solo escribe la línea de abajo.
+
+### Por qué los handles no se adivinan
+
+El alta pedía cinco campos y cuatro había que ir a buscarlos. Dos salen de la
+propia página con buena confianza; los handles casi nunca. Se midió antes de
+decidirlo, con marcas reales:
+
+| Camino | Resultado |
+|---|---|
+| Links sociales en el HTML | aparecen en ~1 de cada 5 sitios; el resto los pinta JavaScript |
+| Ad Library por nombre | devuelve homónimos ("Resilient Retail Club", "Resilient Volleyball Club") |
+| Buscador de cuentas de TikTok | 30 resultados globales; una marca de 138 seguidores no aparece |
+
+El patrón: las marcas que nos interesan son chicas y usan abreviaturas
+—RESILIENT es `@rslnt_mx` y `@resilient_tm`— que es justo lo que ningún buscador
+por nombre encuentra. Así que un handle solo se propone si se **verificó** que
+la cuenta existe y que es de esa marca (Claude compara nombre, bio y giro contra
+lo que sabemos). Si no hay certeza, el campo se queda vacío y el formulario
+explica por qué: prellenar el handle equivocado es peor que dejarlo en blanco,
+porque el research se va callado por la cuenta de alguien más y el error sale
+hasta la llamada.
 
 ### De quién es cada resultado
 
