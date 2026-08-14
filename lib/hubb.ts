@@ -43,12 +43,20 @@ export type HubbCreator = {
 export const HUBB_MAX_LIMIT = 50;
 
 export function hubbReady(): boolean {
-  return Boolean(process.env.HUBB_API_URL && process.env.HUBB_API_TOKEN);
+  return Boolean(hubbBase() && hubbToken());
 }
 
 function hubbBase(): string {
-  const raw = (process.env.HUBB_API_URL || "").replace(/\/+$/, "");
+  const raw = (process.env.HUBB_API_URL || "").trim().replace(/\/+$/, "");
   return raw.replace(/^(https?:\/\/)hubb\.mx/i, "$1www.hubb.mx");
+}
+
+/* Pegar un secreto en el panel de Vercel arrastra espacios y saltos de línea con
+   una facilidad pasmosa, y el síntoma es un 401 idéntico al de un token
+   inválido. Se limpia aquí en vez de pedirle a alguien que mire un campo de
+   texto y adivine si sobra un espacio. */
+function hubbToken(): string {
+  return (process.env.HUBB_API_TOKEN || "").trim();
 }
 
 export type CreatorQuery = {
@@ -165,7 +173,7 @@ export async function searchHubbCreators(query: CreatorQuery): Promise<CreatorPa
   set("seed", query.seed);
 
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${process.env.HUBB_API_TOKEN}` },
+    headers: { Authorization: `Bearer ${hubbToken()}` },
     signal: AbortSignal.timeout(20_000),
     cache: "no-store",
   }).catch((err) => {
@@ -173,7 +181,15 @@ export async function searchHubbCreators(query: CreatorQuery): Promise<CreatorPa
   });
 
   if (res.status === 401) {
-    throw new Error("hubb rechazó el token: revisa HUBB_API_TOKEN (y que HUBB_API_URL lleve www).");
+    /* El 401 se ve igual con un token mal pegado que con uno revocado, así que
+       el mensaje trae con qué se llamó: largo del token y sus últimos 4. Con eso
+       se distingue "quedó el valor viejo" de "sobró un espacio" sin exponer el
+       secreto ni tener que adivinar mirando el panel de Vercel. */
+    const t = hubbToken();
+    throw new Error(
+      `hubb rechazó el token. Se llamó a ${base} con un token de ${t.length} caracteres que termina en "${t.slice(-4)}". ` +
+        `Debe ser de 64 y terminar en "715b".`
+    );
   }
   if (res.status === 403) {
     throw new Error("Al token de hubb le falta el scope creators.read.");
