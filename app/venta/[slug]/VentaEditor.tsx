@@ -86,16 +86,25 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
     // Con el motivo, no solo el bloque: casi siempre es un handle mal escrito,
     // y "Account doesn't exist" se arregla solo con leerlo.
     const why = (data.research?.sourceErrors ?? {}) as Record<string, string>;
-    setMsg(
-      failed.length
-        ? {
-            kind: "error",
-            text: `Se trajo lo demás. Falló ${failed
-              .map((k) => (why[k] ? `${k} (${why[k]})` : k))
-              .join("; ")}. Llénalo a mano abajo.`,
-          }
-        : { kind: "ok", text: "Datos actualizados." }
-    );
+    if (failed.length) {
+      setMsg({
+        kind: "error",
+        text: `Se trajo lo demás. Falló ${failed
+          .map((k) => (why[k] ? `${k} (${why[k]})` : k))
+          .join("; ")}. Llénalo a mano abajo.`,
+      });
+    } else if (data.ruido) {
+      // El término de búsqueda trajo puro contenido ajeno: es lo primero que hay
+      // que corregir, antes que cualquier texto del deck.
+      setMsg({ kind: "error", text: data.ruido });
+    } else {
+      setMsg({
+        kind: "ok",
+        text: data.consulta?.porque
+          ? `Datos actualizados. Busqué “${data.consulta.query}”: ${data.consulta.porque}`
+          : "Datos actualizados.",
+      });
+    }
   }, [project.slug]);
 
   // Al llegar desde /venta/nueva, arranca la búsqueda sola.
@@ -322,8 +331,12 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
               label="Qué se buscó"
               value={research.search?.query}
               onChange={(v) => patch({ search: { query: v, results: research.search?.results ?? [], screenshot: research.search?.screenshot } })}
-              placeholder="Si la marca se llama como una palabra común, agrega algo: 'resilient club'"
+              placeholder="acapella ropa"
             />
+            <p className="-mt-3 text-xs text-fg-faint">
+              El nombre solo casi nunca sirve: <b>acapella</b> trae gente cantando, <b>acapella ropa</b> trae la marca.
+              Si cambias esto, vuelve a darle a <b>Buscar datos</b>.
+            </p>
 
             {/* Sin esta lista no hay forma de separar a otra marca de un creador:
                 las dos son cuentas de terceros publicando sobre la categoría. */}

@@ -89,11 +89,24 @@ copy más plano) y la estrategia no se puede parsear. Sin
      ese contenido lo subió gente de fuera y sería falso decirlo frente al
      cliente.
 
-   Si el nombre de la marca es una palabra común, la búsqueda trae ruido:
-   "resilient" devuelve videos de motivación. Cambia el término por algo más
-   específico ("resilient club") y vuelve a correrla. Cuando un bloque falla, el
-   editor dice por qué; casi siempre es un handle mal escrito, y ScrapeCreators
-   responde eso con un **200**, no con un 404.
+   **El término de búsqueda es la decisión más importante de todo el research.**
+   Nadie busca el nombre pelón: quien oyó de la marca escribe el nombre *más*
+   lo que vende. La diferencia no es sutil:
+
+   | `acapella` | `acapella ropa` |
+   |---|---|
+   | @germangents · 24M · barbershop quartet | **@acapellaco** · 23.4M · la marca |
+   | @ynehya · 16.6M · covers | **@acapellaco** · 11.7M |
+
+   Por eso la primera búsqueda no usa el nombre solo: `sugerirConsulta()` arma
+   el término con la marca y su categoría, y sabe cuándo NO agregar nada
+   (*Telcel* y *Nuvaskin* son inconfundibles; *Apple* se vuelve "apple iphone").
+   Queda editable en el editor, y si aun así la mayoría de los resultados no
+   hablan de la marca, la app te lo dice al terminar en vez de dejarte publicar
+   una slide llena de contenido ajeno.
+
+   Cuando un bloque falla, el editor dice por qué; casi siempre es un handle mal
+   escrito, y ScrapeCreators responde eso con un **200**, no con un 404.
 3. Revisas y corriges todo en el editor. Cada bloque dice si se trajo solo, si
    falló o si lo pusiste a mano. Si algo no se pudo, subes la captura.
 4. **Escribir copy** — Claude arma los textos de las 3 slides respetando los

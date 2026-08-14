@@ -6,6 +6,8 @@
 import { getProject } from "@/lib/projects";
 import { getVenta, saveVenta } from "@/lib/venta/store";
 import { runScrape } from "@/lib/scrape/research";
+import { sugerirConsulta } from "@/lib/venta/consulta";
+import { veredictos } from "@/lib/venta/owner";
 import { scrapeReady } from "@/lib/scrape/scrapecreators";
 import { requireSessionApi, apiError } from "@/lib/session";
 import type { Research } from "@/lib/venta/types";
@@ -31,6 +33,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
     const r = (current?.research ?? {}) as Research;
     const body = (await req.json().catch(() => ({}))) as { adPageId?: string; searchQuery?: string };
 
+    /* El término de búsqueda decide qué sale en la slide 1, así que la primera
+       vez no se usa el nombre pelón: "acapella" trae gente cantando, "apple"
+       trae manzanas. Se propone nombre + categoría y queda editable. */
+    let searchQuery = body.searchQuery ?? r.search?.query;
+    let consultaPorque: string | undefined;
+    if (!searchQuery) {
+      const sug = await sugerirConsulta(project.brand, r.industry);
+      searchQuery = sug.consulta;
+      consultaPorque = sug.porque;
+    }
+
     const scraped = await runScrape({
       slug: project.slug,
       brand: project.brand,
@@ -38,7 +51,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
       instagramHandle: r.instagram?.handle,
       tiktokHandle: r.tiktok?.handle,
       adPageId: body.adPageId ?? r.adPageId,
-      searchQuery: body.searchQuery ?? r.search?.query ?? project.brand,
+      searchQuery,
       competitors: r.competitors,
       industry: r.industry,
     });
@@ -57,7 +70,20 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
 
     await saveVenta(project.id, { research: merged, deck: current?.deck ?? null, engine: current?.engine });
 
-    return Response.json({ research: merged, sources: scraped.sources });
+    /* Si casi nada de lo que salió habla de la marca, el término está mal y hay
+       que decirlo: es el error más común y el más caro, porque la slide 1 se
+       llena de contenido ajeno sin que nadie lo note hasta la llamada. */
+    const v = veredictos(merged.search?.results);
+    const ruido = v.dominaElRuido
+      ? `De los ${v.total} resultados de “${searchQuery}”, ${v.totalOtros} no hablan de la marca. Prueba un término más específico: el nombre más lo que venden.`
+      : undefined;
+
+    return Response.json({
+      research: merged,
+      sources: scraped.sources,
+      consulta: consultaPorque ? { query: searchQuery, porque: consultaPorque } : undefined,
+      ruido,
+    });
   } catch (err) {
     return apiError(err);
   }
