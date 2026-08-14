@@ -6,6 +6,10 @@
    conexión a Postgres. */
 export const LIMITS = {
   subtitle: 165,
+  /* Las tres líneas de la slide 1 van debajo de un número grande y se leen de
+     un vistazo mientras hablas. Si crecen, dejan de leerse; con menos de 110
+     se cortaban a media frase. */
+  veredicto: 110,
   cardTitle: 40,
   cardDesc: 152,
   insightTitle: 52,

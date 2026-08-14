@@ -38,7 +38,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
       instagramHandle: r.instagram?.handle,
       tiktokHandle: r.tiktok?.handle,
       adPageId: body.adPageId ?? r.adPageId,
-      searchQuery: body.searchQuery ?? project.brand,
+      searchQuery: body.searchQuery ?? r.search?.query ?? project.brand,
+      competitors: r.competitors,
     });
 
     /* Lo scrapeado gana sobre lo viejo, pero se conservan los campos que solo

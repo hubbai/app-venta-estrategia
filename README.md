@@ -98,9 +98,36 @@ copy más plano) y la estrategia no se puede parsear. Sin
    límites de caracteres y las notas de estilo del equipo. Los puedes editar.
 5. **Publicar** — el HTML se congela y `fs.hubb.mx/r/{slug}` ya sirve.
 
-Las 3 slides: **Paid Media** (anuncios corriendo + 3 ideas de script del mes 1),
-**Presencia orgánica** (perfiles + mejores videos propios) y **Creadores**
-(buscador de TikTok + creador externo vs. marca + cierre).
+Las 3 slides, en el orden en que se proyectan:
+
+1. **Cuando te buscan en TikTok** — la parrilla de resultados y tres respuestas:
+   ¿sale la marca y en qué lugar?, ¿cuántos resultados son de la competencia?,
+   ¿cuántos son de creadores? Abre la llamada porque es lo único del deck que la
+   marca no controla: es lo que ve un comprador suyo.
+2. **Presencia en Ads** — lo que está corriendo hoy + 3 ideas de script del mes 1.
+3. **Presencia orgánica** — perfiles, creador externo vs. marca y el cierre.
+
+Los números de la slide 1 los calcula el render con los datos, no Claude: son
+afirmaciones que se dicen en voz alta frente al cliente y no pueden depender de
+que el modelo cuente bien. Claude solo escribe la línea de abajo.
+
+### De quién es cada resultado
+
+Un resultado del buscador es de la **marca**, de la **competencia** o de un
+**creador**, y la slide afirma cosas sobre eso. Se decide con reglas explícitas
+(`lib/venta/owner.ts`) y se puede corregir a mano en el editor:
+
+- **Marca** — el handle coincide con la cuenta configurada, o contiene el nombre
+  de la marca normalizado. Esto último es lo que atrapa las cuentas secundarias:
+  RESILIENT es `@rslnt_mx` en TikTok, pero también publica desde
+  `@resilientclub1`, y sin esa regla su propio video se presentaba como prueba de
+  que "gente de fuera habla de la marca".
+- **Competencia** — coincide con la lista que escribes en el editor. No se
+  adivina: otra marca y un creador son lo mismo vistos desde fuera.
+- **Creador** — todo lo demás.
+
+Marcas de menos de 5 letras no aplican la regla de "contiene": daría falsos
+positivos por todos lados.
 
 ## Flujo: estrategia
 

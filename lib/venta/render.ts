@@ -1,19 +1,30 @@
 /* render.ts — El entregable: 3 slides 16:9 auto-escaladas.
 
-   Portado de research-pitch/src/deck-html.js, con una slide más. El HTML es
-   autocontenido (salvo la fuente de Google) porque se sirve tal cual desde
-   fs.hubb.mx/r/{slug} sin pasar por React.
+   Portado de research-pitch/src/deck-html.js. El HTML es autocontenido (salvo
+   la fuente de Google) porque se sirve tal cual desde fs.hubb.mx/r/{slug} sin
+   pasar por React.
 
-   1 · Paid Media    — anuncios corriendo + 3 ideas de script del mes 1
-   2 · Orgánico      — perfiles de IG/TikTok + los 2 mejores videos propios
-   3 · Creadores     — el buscador de TikTok + creador vs. marca + cierre */
+   1 · Buscador   — qué sale al buscar la marca en TikTok. ABRE la llamada.
+   2 · Paid Media — anuncios corriendo + 3 ideas de script del mes 1
+   3 · Orgánico   — perfiles de IG/TikTok + creador vs. marca + cierre
+
+   El buscador va primero a propósito: antes de hablar de pauta o de seguidores,
+   el cliente ve lo que un comprador suyo ve al buscarlo, que es lo único de
+   todo el deck que él no controla. */
 import { C, esc, escUrl, FONT_LINK } from "../theme";
-import type { Ad, Clip, Deck, Profile, Research } from "./types";
+import { veredictos, type Veredictos } from "./owner";
+import type { Ad, Clip, Deck, Owner, Profile, Research } from "./types";
 
 const TITLES = {
+  buscador: `Cuando te buscan en <span class="gold">TikTok</span>`,
   ads: `Presencia en <span class="gold">Ads</span>`,
   organico: `Presencia <span class="gold">orgánica</span>`,
-  creadores: `Lo que dicen los <span class="gold">creadores</span>`,
+};
+
+const OWNER_LABEL: Record<Owner, string> = {
+  marca: "Marca",
+  competencia: "Competencia",
+  creador: "Creador",
 };
 
 function adCard(ad: Ad): string {
@@ -69,16 +80,71 @@ function clipStrip(list: Clip[] = [], limit = 2): string {
     .join("")}</div>`;
 }
 
-/* La parrilla del buscador de TikTok, reconstruida con resultados reales. */
+/* La parrilla del buscador de TikTok, reconstruida con resultados reales.
+
+   Cada resultado lleva de quién es. Sin esa etiqueta la parrilla son seis
+   miniaturas y ya; con ella se ve de un golpe quién está ocupando el espacio,
+   que es el argumento entero de la slide. */
 function searchGrid(clips: Clip[] = []): string {
   const shots = clips.slice(0, 6);
   if (!shots.length) return "";
   return `<div class="sgrid">${shots
-    .map(
-      (c) => `<figure class="sc">
-        <div class="stb"${c.image ? ` style="background-image:url('${escUrl(c.image)}')"` : ""}></div>
+    .map((c, i) => {
+      const owner = c.owner ?? "creador";
+      return `<figure class="sc ${owner}">
+        <div class="stb"${c.image ? ` style="background-image:url('${escUrl(c.image)}')"` : ""}>
+          <span class="pos">${i + 1}</span>
+          <span class="own">${OWNER_LABEL[owner]}</span>
+        </div>
         <figcaption><b>${esc(c.views || "—")}</b><span>@${esc(c.author || "?")}</span></figcaption>
-      </figure>`
+      </figure>`;
+    })
+    .join("")}</div>`;
+}
+
+/* Las tres respuestas de la slide 1.
+
+   El número y el sí/no salen de los datos, no de Claude: son afirmaciones que
+   se dicen frente al cliente y no pueden depender de que el modelo cuente
+   bien. Claude solo escribe la línea de abajo, la que dice qué significan. */
+function veredictoCards(v: Veredictos, copy: Deck["buscador"]["veredictos"]): string {
+  const cards: { q: string; big: string; cap: string; line: string; tone: "bad" | "good" | "flat" }[] = [
+    {
+      q: "¿Sales tú?",
+      big: v.posicionMarca ? `#${v.posicionMarca}` : "No",
+      cap: v.posicionMarca ? `de ${v.total} resultados` : "no apareces en los resultados",
+      line: copy.marca,
+      tone: v.posicionMarca ? "good" : "bad",
+    },
+    {
+      q: "¿Sale tu competencia?",
+      big: v.totalCompetencia > 0 ? String(v.totalCompetencia) : "No",
+      cap: v.totalCompetencia > 0 ? `de ${v.total} son de otras marcas` : "ninguna otra marca aparece",
+      line: copy.competencia,
+      tone: v.totalCompetencia > 0 ? "bad" : "good",
+    },
+    {
+      q: "¿Hay creadores hablando de ti?",
+      big: v.totalCreadores > 0 ? String(v.totalCreadores) : "No",
+      cap:
+        v.totalCreadores > 0
+          ? v.mejorCreador?.views
+            ? `de ${v.total}, el mejor con ${esc(v.mejorCreador.views)} views`
+            : `de ${v.total} resultados`
+          : "todavía ninguno",
+      line: copy.creadores,
+      tone: v.totalCreadores > 0 ? "good" : "flat",
+    },
+  ];
+
+  return `<div class="vers">${cards
+    .map(
+      (c) => `<article class="ver ${c.tone}">
+        <div class="vq">${esc(c.q)}</div>
+        <div class="vbig">${esc(c.big)}</div>
+        <div class="vcap">${c.cap}</div>
+        ${c.line ? `<p class="vline">${esc(c.line)}</p>` : ""}
+      </article>`
     )
     .join("")}</div>`;
 }
@@ -89,12 +155,14 @@ export function renderVenta(research: Research, deck: Deck): string {
   const adCount = research.adCount ?? 0;
   const shots = (research.ads || []).slice(0, 4);
 
-  const ideas = (deck.s1.cards || [])
+  const ideas = (deck.paid.cards || [])
     .map(
       (c, i) => `<article class="idea"><div class="num">${i + 1}</div>
         <div><h3>${esc(c.title)}</h3><p>${esc(c.desc)}</p></div></article>`
     )
     .join("");
+
+  const v = veredictos(research.search?.results);
 
   const searchLabel = research.search?.query
     ? `Al buscar “${esc(research.search.query)}” en TikTok`
@@ -181,13 +249,36 @@ ${FONT_LINK}
   .insight h4{font-size:17px;font-weight:700;line-height:1.2}
   .insight p{margin-top:6px;font-size:13.5px;line-height:1.45;color:#${C.gray}}
 
-  /* Slide 3 · buscador + comparativa */
+  /* Slide 1 · el buscador */
   .sgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
-  .sc .stb{height:118px;border-radius:10px;background-size:cover;background-position:center;
+  .sc .stb{position:relative;height:186px;border-radius:10px;background-size:cover;background-position:center;
            background-color:#${C.neutralBg};border:1px solid #${C.border}}
+  .sc .pos{position:absolute;left:7px;top:7px;width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:700;
+           display:flex;align-items:center;justify-content:center;background:rgba(26,26,26,.72);color:#${C.cream}}
+  .sc .own{position:absolute;left:7px;bottom:7px;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+           padding:3px 7px;border-radius:999px;background:rgba(255,251,242,.93);color:#${C.gray}}
+  /* La marca en dorado, la competencia marcada, el creador en verde: el color
+     hace el argumento antes de que alguien lea las etiquetas. */
+  .sc.marca .stb{border-color:#${C.gold};box-shadow:0 0 0 2px #${C.gold}}
+  .sc.marca .own{background:#${C.goldDark};color:#${C.white}}
+  .sc.competencia .own{background:#${C.ink};color:#${C.cream}}
+  .sc.creador .own{background:#${C.greenBg};color:#${C.greenText}}
   .sc figcaption{margin-top:6px;text-align:center}
   .sc figcaption b{display:block;font-size:13px;font-weight:700;color:#${C.ink}}
   .sc figcaption span{display:block;font-size:10.5px;color:#${C.grayLight};overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* Las tres respuestas */
+  .vers{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .ver{background:#${C.white};border:1px solid #${C.border};border-radius:14px;padding:14px 18px 16px;
+       box-shadow:0 6px 18px rgba(26,26,26,.07)}
+  .ver.good{border-color:#${C.gold};background:#${C.goldLight}}
+  .ver.bad{border-color:#${C.ink}}
+  .vq{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#${C.grayLight}}
+  .vbig{font-size:40px;font-weight:700;line-height:1;margin-top:8px;letter-spacing:-.02em}
+  .vcap{font-size:11.5px;color:#${C.gray};margin-top:5px}
+  .vline{font-size:13px;line-height:1.4;color:#${C.ink};margin-top:10px;padding-top:10px;border-top:1px solid #${C.border}}
+
+  /* Slide 3 · comparativa */
   .comp{display:grid;grid-template-columns:1fr 1fr;gap:18px}
   .cmp{background:#${C.white};border:1px solid #${C.border};border-radius:14px;padding:14px 18px 16px;
        box-shadow:0 6px 18px rgba(26,26,26,.07);display:flex;gap:14px;align-items:flex-start}
@@ -220,11 +311,31 @@ ${FONT_LINK}
 <div id="stage">
   <div id="deck">
 
-    <section class="slide on" data-i="0">
+    <section class="slide wide on" data-i="0">
+      <div class="head">
+        <div class="eyebrow">/ ${esc(brand)} · Buscador de TikTok</div>
+        <h1>${TITLES.buscador}</h1>
+        <p class="sub">${esc(deck.buscador.subtitle)}</p>
+      </div>
+      <div class="body">
+        ${
+          research.search?.screenshot
+            ? `<div><div class="lbl">${searchLabel}</div>
+                 <div class="pshot" style="height:210px;background-image:url('${escUrl(research.search.screenshot)}')"></div></div>`
+            : research.search?.results?.length
+              ? `<div><div class="lbl">${searchLabel}</div>${searchGrid(research.search.results)}</div>`
+              : `<div class="lbl">${searchLabel}</div>`
+        }
+        ${veredictoCards(v, deck.buscador.veredictos)}
+      </div>
+      <footer>${footer}</footer>
+    </section>
+
+    <section class="slide" data-i="1">
       <div class="head">
         <div class="eyebrow">/ ${esc(brand)} · Paid Media</div>
         <h1>${TITLES.ads}</h1>
-        <p class="sub">${esc(deck.s1.subtitle)}</p>
+        <p class="sub">${esc(deck.paid.subtitle)}</p>
       </div>
       <div class="pill-card">
         <div class="plbl">Ad Library · México</div>
@@ -239,11 +350,11 @@ ${FONT_LINK}
       <footer>${footer}</footer>
     </section>
 
-    <section class="slide wide" data-i="1">
+    <section class="slide wide" data-i="2">
       <div class="head">
         <div class="eyebrow">/ ${esc(brand)} · Redes</div>
         <h1>${TITLES.organico}</h1>
-        <p class="sub">${esc(deck.s2.subtitle)}</p>
+        <p class="sub">${esc(deck.organico.subtitle)}</p>
       </div>
       <div class="body">
         <div>
@@ -253,53 +364,27 @@ ${FONT_LINK}
             ${profileCard(research.tiktok, "TikTok")}
           </div>
         </div>
-        <div class="insight">
-          ${clipStrip(research.organic?.brand)}
-          <div>
-            <h4>${esc(deck.s2.insight.title)}</h4>
-            <p>${esc(deck.s2.insight.desc)}</p>
-          </div>
-        </div>
-      </div>
-      <footer>${footer}</footer>
-    </section>
-
-    <section class="slide wide" data-i="2">
-      <div class="head">
-        <div class="eyebrow">/ ${esc(brand)} · Creadores</div>
-        <h1>${TITLES.creadores}</h1>
-        <p class="sub">${esc(deck.s3.subtitle)}</p>
-      </div>
-      <div class="body">
-        ${
-          research.search?.screenshot
-            ? `<div><div class="lbl">${searchLabel}</div>
-                 <div class="pshot" style="height:200px;background-image:url('${escUrl(research.search.screenshot)}')"></div></div>`
-            : research.search?.results?.length
-              ? `<div><div class="lbl">${searchLabel}</div>${searchGrid(research.search.results)}</div>`
-              : ""
-        }
         <div class="comp">
           <article class="cmp win">
             ${clipStrip(research.organic?.creators)}
             <div>
-              <span class="badge good">${esc(deck.s3.win.label || "Mejor resultado")}</span>
-              <h3>${esc(deck.s3.win.title)}</h3>
-              <p>${esc(deck.s3.win.desc)}</p>
+              <span class="badge good">${esc(deck.organico.win.label || "Mejor resultado")}</span>
+              <h3>${esc(deck.organico.win.title)}</h3>
+              <p>${esc(deck.organico.win.desc)}</p>
             </div>
           </article>
           <article class="cmp">
             ${clipStrip(research.organic?.brand)}
             <div>
-              <span class="badge neutral">${esc(deck.s3.own.label || "Resultado propio")}</span>
-              <h3>${esc(deck.s3.own.title)}</h3>
-              <p>${esc(deck.s3.own.desc)}</p>
+              <span class="badge neutral">${esc(deck.organico.own.label || "Resultado propio")}</span>
+              <h3>${esc(deck.organico.own.title)}</h3>
+              <p>${esc(deck.organico.own.desc)}</p>
             </div>
           </article>
         </div>
         <div class="closing">
-          <h4>${esc(deck.s3.closing.title)}</h4>
-          <p>${esc(deck.s3.closing.text)}</p>
+          <h4>${esc(deck.organico.closing.title)}</h4>
+          <p>${esc(deck.organico.closing.text)}</p>
         </div>
       </div>
       <footer>${footer}</footer>

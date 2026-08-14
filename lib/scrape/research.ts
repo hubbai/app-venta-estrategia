@@ -15,6 +15,7 @@ import {
   type RawTtVideo,
 } from "./scrapecreators";
 import { mirror } from "../blob";
+import { clasificarResultados } from "../venta/owner";
 import type { Ad, Clip, Profile, Research } from "../venta/types";
 
 type Sources = NonNullable<Research["sources"]>;
@@ -36,6 +37,8 @@ export type ScrapeInput = {
   /* Si ya elegiste el anunciante en el desambiguador, se manda su page_id. */
   adPageId?: string;
   searchQuery?: string;
+  /* Nombres o handles de la competencia, para separarla de los creadores. */
+  competitors?: string[];
 };
 
 export async function runScrape(input: ScrapeInput): Promise<Partial<Research>> {
@@ -52,8 +55,15 @@ export async function runScrape(input: ScrapeInput): Promise<Partial<Research>> 
   ]);
 
   const ownClips = ttVideos ?? [];
-  const own = (input.tiktokHandle || "").replace(/^@/, "").toLowerCase();
-  const creatorClips = (search?.results ?? []).filter((c) => !esDeLaMarca(c.author, own, input.brand)).slice(0, 2);
+
+  /* De quién es cada resultado del buscador. Es lo primero que se proyecta en
+     la llamada, así que se etiqueta aquí y se puede corregir en el editor. */
+  const clasificados = clasificarResultados(search?.results ?? [], {
+    brand: input.brand,
+    ownHandles: [input.tiktokHandle, input.instagramHandle, tt?.handle, ig?.handle],
+    competitors: input.competitors,
+  });
+  const creatorClips = clasificados.filter((c) => c.owner === "creador").slice(0, 2);
 
   const bestOwn = ownClips[0]?.viewsNum ?? 0;
   const bestCreator = creatorClips[0]?.viewsNum ?? 0;
@@ -66,7 +76,7 @@ export async function runScrape(input: ScrapeInput): Promise<Partial<Research>> 
     tiktok: tt ?? undefined,
     networks: buildNetworks(ig, tt, ownClips),
     organic: { brand: ownClips.slice(0, 2), creators: creatorClips },
-    search: search ?? undefined,
+    search: search ? { ...search, results: clasificados } : undefined,
     bestContent,
     bestViews: bestContent === "creador" ? creatorClips[0]?.views : ownClips[0]?.views,
     ownViews: ownClips[0]?.views,
@@ -263,29 +273,6 @@ async function scrapeSearch(
     anota(errors, "busqueda", err);
     return null;
   }
-}
-
-/* ¿Ese video del buscador es de la marca disfrazada de creador?
-
-   La slide 3 afirma que los primeros resultados los subió gente que NO trabaja
-   con la marca. Si ahí se cuela una cuenta secundaria de la propia marca, la
-   afirmación es falsa y se dice en voz alta frente al cliente. Comparar solo
-   contra el handle configurado no basta: RESILIENT es @rslnt_mx en TikTok, pero
-   su otra cuenta es @resilientclub1.
-
-   Se descarta al autor cuyo handle contenga el nombre de la marca ya
-   normalizado. Es estrecho a propósito: para RESILIENT saca a
-   "resilientclub1" y deja pasar "resilienciaclub", que no lo contiene. Si de
-   todos modos se cuela algo, se quita desde el editor. */
-function esDeLaMarca(author: string | undefined, ownHandle: string, brand: string): boolean {
-  const a = (author || "").toLowerCase();
-  if (!a) return false;
-  if (a === ownHandle) return true;
-
-  const key = brand.toLowerCase().replace(/[^a-z0-9]/g, "");
-  // Marcas de nombre muy corto darían falsos positivos por todos lados.
-  if (key.length < 5) return false;
-  return a.replace(/[^a-z0-9]/g, "").includes(key);
 }
 
 function sortByViews(list: RawTtVideo[]): RawTtVideo[] {

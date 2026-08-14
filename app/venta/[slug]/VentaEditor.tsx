@@ -14,7 +14,8 @@ import { Area, Section, SourceBadge, Text } from "@/components/Field";
 import AdvertiserPicker from "./AdvertiserPicker";
 import DangerZone from "@/components/DangerZone";
 import { LIMITS } from "@/lib/venta/limits";
-import type { Deck, Research } from "@/lib/venta/types";
+import { MANUAL } from "@/lib/venta/owner";
+import type { Deck, Owner, Research } from "@/lib/venta/types";
 
 type Props = {
   project: { slug: string; brand: string; status: "draft" | "published" };
@@ -316,22 +317,57 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
             onUpload={(f) => uploadShot("tiktok", f)}
           />
 
-          <Section title="Videos y creadores" subtitle="Lo que sale al buscar la marca en TikTok" badge={<SourceBadge state={src.busqueda} />}>
+          <Section title="Buscador de TikTok" subtitle="Es la slide 1: lo primero que se proyecta" badge={<SourceBadge state={src.busqueda} />} defaultOpen>
             <Text
               label="Qué se buscó"
               value={research.search?.query}
               onChange={(v) => patch({ search: { query: v, results: research.search?.results ?? [], screenshot: research.search?.screenshot } })}
+              placeholder="Si la marca se llama como una palabra común, agrega algo: 'resilient club'"
+            />
+
+            {/* Sin esta lista no hay forma de separar a otra marca de un creador:
+                las dos son cuentas de terceros publicando sobre la categoría. */}
+            <Text
+              label="Competencia (separada por comas)"
+              value={(research.competitors ?? []).join(", ")}
+              onChange={(v) => patch({ competitors: v.split(",").map((x) => x.trim()).filter(Boolean) })}
+              placeholder="nike, adidas, otramarca_mx"
             />
 
             {(research.search?.results ?? []).length > 0 && (
               <div>
-                <span className="label">Resultados del buscador</span>
-                <div className="grid grid-cols-6 gap-2">
+                <span className="label">Resultados · de quién es cada uno</span>
+                <p className="mb-2 text-xs text-fg-faint">
+                  La slide afirma esto frente al cliente. Si algo está mal clasificado, corrígelo aquí.
+                </p>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                   {research.search!.results.map((c, i) => (
                     <figure key={i} className="overflow-hidden rounded-lg border border-line bg-surface-2">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {c.image && <img src={c.image} alt="" className="h-20 w-full object-cover" />}
-                      <figcaption className="p-1 text-center text-[10px] font-semibold">{c.views}</figcaption>
+                      <figcaption className="space-y-1 p-1 text-center">
+                        <div className="text-[10px] font-semibold">{c.views}</div>
+                        <div className="truncate text-[9px] text-fg-faint" title={c.author}>@{c.author}</div>
+                        <select
+                          className="w-full rounded border border-line bg-surface px-1 py-0.5 text-[10px]"
+                          value={c.owner ?? "creador"}
+                          onChange={(e) =>
+                            patch({
+                              search: {
+                                query: research.search?.query || project.brand,
+                                screenshot: research.search?.screenshot,
+                                results: research.search!.results.map((x, j) =>
+                                  j === i ? { ...x, owner: e.target.value as Owner, ownerWhy: MANUAL } : x
+                                ),
+                              },
+                            })
+                          }
+                        >
+                          <option value="marca">Marca</option>
+                          <option value="competencia">Competencia</option>
+                          <option value="creador">Creador</option>
+                        </select>
+                      </figcaption>
                     </figure>
                   ))}
                 </div>
@@ -536,65 +572,85 @@ function DeckSection({ deck, onChange }: { deck: Deck | null; onChange: (d: Deck
   return (
     <Section title="Copy de las slides" subtitle="Lo que escribió Claude, editable" defaultOpen>
       <div className="space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-fg-faint">Slide 1 · Paid Media</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-fg-faint">Slide 1 · Buscador de TikTok</p>
         <Area
           label="Subtítulo"
           max={LIMITS.subtitle}
-          value={deck.s1.subtitle}
-          onChange={(v) => set((d) => ({ ...d, s1: { ...d.s1, subtitle: v } }))}
+          value={deck.buscador.subtitle}
+          onChange={(v) => set((d) => ({ ...d, buscador: { ...d.buscador, subtitle: v } }))}
         />
-        {deck.s1.cards.map((c, i) => (
+        {/* Los números los calcula el render con los resultados; esto es la lectura. */}
+        {(
+          [
+            ["marca", "¿Sale la marca?"],
+            ["competencia", "¿Sale la competencia?"],
+            ["creadores", "¿Hay creadores hablando de ella?"],
+          ] as const
+        ).map(([key, label]) => (
+          <Area
+            key={key}
+            label={label}
+            rows={2}
+            max={LIMITS.veredicto}
+            value={deck.buscador.veredictos[key]}
+            onChange={(v) =>
+              set((d) => ({ ...d, buscador: { ...d.buscador, veredictos: { ...d.buscador.veredictos, [key]: v } } }))
+            }
+          />
+        ))}
+      </div>
+
+      <div className="space-y-4 border-t border-line pt-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-fg-faint">Slide 2 · Paid Media</p>
+        <Area
+          label="Subtítulo"
+          max={LIMITS.subtitle}
+          value={deck.paid.subtitle}
+          onChange={(v) => set((d) => ({ ...d, paid: { ...d.paid, subtitle: v } }))}
+        />
+        {deck.paid.cards.map((c, i) => (
           <div key={i} className="space-y-3 rounded-lg border border-line bg-surface-2 p-3">
             <Area
               label={`Idea ${i + 1} · título`}
               rows={1}
               max={LIMITS.cardTitle}
               value={c.title}
-              onChange={(v) => set((d) => ({ ...d, s1: { ...d.s1, cards: d.s1.cards.map((x, j) => (j === i ? { ...x, title: v } : x)) } }))}
+              onChange={(v) =>
+                set((d) => ({ ...d, paid: { ...d.paid, cards: d.paid.cards.map((x, j) => (j === i ? { ...x, title: v } : x)) } }))
+              }
             />
             <Area
               label={`Idea ${i + 1} · descripción`}
               max={LIMITS.cardDesc}
               value={c.desc}
-              onChange={(v) => set((d) => ({ ...d, s1: { ...d.s1, cards: d.s1.cards.map((x, j) => (j === i ? { ...x, desc: v } : x)) } }))}
+              onChange={(v) =>
+                set((d) => ({ ...d, paid: { ...d.paid, cards: d.paid.cards.map((x, j) => (j === i ? { ...x, desc: v } : x)) } }))
+              }
             />
           </div>
         ))}
       </div>
 
       <div className="space-y-4 border-t border-line pt-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-fg-faint">Slide 2 · Orgánico</p>
-        <Area label="Subtítulo" max={LIMITS.subtitle} value={deck.s2.subtitle} onChange={(v) => set((d) => ({ ...d, s2: { ...d.s2, subtitle: v } }))} />
+        <p className="text-xs font-semibold uppercase tracking-wider text-fg-faint">Slide 3 · Orgánico y cierre</p>
         <Area
-          label="Hallazgo · título"
-          rows={1}
-          max={LIMITS.insightTitle}
-          value={deck.s2.insight.title}
-          onChange={(v) => set((d) => ({ ...d, s2: { ...d.s2, insight: { ...d.s2.insight, title: v } } }))}
+          label="Subtítulo"
+          max={LIMITS.subtitle}
+          value={deck.organico.subtitle}
+          onChange={(v) => set((d) => ({ ...d, organico: { ...d.organico, subtitle: v } }))}
         />
-        <Area
-          label="Hallazgo · texto"
-          max={LIMITS.insightDesc}
-          value={deck.s2.insight.desc}
-          onChange={(v) => set((d) => ({ ...d, s2: { ...d.s2, insight: { ...d.s2.insight, desc: v } } }))}
-        />
-      </div>
-
-      <div className="space-y-4 border-t border-line pt-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-fg-faint">Slide 3 · Creadores</p>
-        <Area label="Subtítulo" max={LIMITS.subtitle} value={deck.s3.subtitle} onChange={(v) => set((d) => ({ ...d, s3: { ...d.s3, subtitle: v } }))} />
 
         {(["win", "own"] as const).map((key) => (
           <div key={key} className="space-y-3 rounded-lg border border-line bg-surface-2 p-3">
             <p className="text-xs font-semibold text-fg-muted">{key === "win" ? "Tarjeta destacada" : "Tarjeta de la marca"}</p>
-            <Area label="Etiqueta" rows={1} max={LIMITS.compLabel} value={deck.s3[key].label} onChange={(v) => set((d) => ({ ...d, s3: { ...d.s3, [key]: { ...d.s3[key], label: v } } }))} />
-            <Area label="Título" rows={1} max={LIMITS.compTitle} value={deck.s3[key].title} onChange={(v) => set((d) => ({ ...d, s3: { ...d.s3, [key]: { ...d.s3[key], title: v } } }))} />
-            <Area label="Descripción" max={LIMITS.compDesc} value={deck.s3[key].desc} onChange={(v) => set((d) => ({ ...d, s3: { ...d.s3, [key]: { ...d.s3[key], desc: v } } }))} />
+            <Area label="Etiqueta" rows={1} max={LIMITS.compLabel} value={deck.organico[key].label} onChange={(v) => set((d) => ({ ...d, organico: { ...d.organico, [key]: { ...d.organico[key], label: v } } }))} />
+            <Area label="Título" rows={1} max={LIMITS.compTitle} value={deck.organico[key].title} onChange={(v) => set((d) => ({ ...d, organico: { ...d.organico, [key]: { ...d.organico[key], title: v } } }))} />
+            <Area label="Descripción" max={LIMITS.compDesc} value={deck.organico[key].desc} onChange={(v) => set((d) => ({ ...d, organico: { ...d.organico, [key]: { ...d.organico[key], desc: v } } }))} />
           </div>
         ))}
 
-        <Area label="Cierre · título" rows={1} max={LIMITS.closingTitle} value={deck.s3.closing.title} onChange={(v) => set((d) => ({ ...d, s3: { ...d.s3, closing: { ...d.s3.closing, title: v } } }))} />
-        <Area label="Cierre · texto" max={LIMITS.closingText} value={deck.s3.closing.text} onChange={(v) => set((d) => ({ ...d, s3: { ...d.s3, closing: { ...d.s3.closing, text: v } } }))} />
+        <Area label="Cierre · título" rows={1} max={LIMITS.closingTitle} value={deck.organico.closing.title} onChange={(v) => set((d) => ({ ...d, organico: { ...d.organico, closing: { ...d.organico.closing, title: v } } }))} />
+        <Area label="Cierre · texto" max={LIMITS.closingText} value={deck.organico.closing.text} onChange={(v) => set((d) => ({ ...d, organico: { ...d.organico, closing: { ...d.organico.closing, text: v } } }))} />
       </div>
     </Section>
   );
