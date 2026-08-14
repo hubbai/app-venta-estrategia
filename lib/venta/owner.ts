@@ -68,24 +68,34 @@ export type Veredictos = {
   totalMarca: number;
   totalCompetencia: number;
   totalCreadores: number;
+  /** Los que no hablan de la marca: el ruido de un nombre genérico. */
+  totalOtros: number;
   total: number;
   /** El video de creador con más views, que es el que sostiene el argumento. */
   mejorCreador?: Clip;
   mejorCompetencia?: Clip;
+  /* Cuando la mayoría del buscador no habla de la marca, el hallazgo cambia:
+     ya no es "quién ocupa tu espacio" sino "tu nombre no es tuyo ahí". */
+  dominaElRuido: boolean;
 };
 
 export function veredictos(results: Clip[] = []): Veredictos {
   const conOwner = results.map((c) => ({ ...c, owner: c.owner ?? "creador" }));
   const idx = conOwner.findIndex((c) => c.owner === "marca");
   const porViews = (list: Clip[]) => [...list].sort((a, b) => (b.viewsNum ?? 0) - (a.viewsNum ?? 0))[0];
+  const cuenta = (o: Owner) => conOwner.filter((c) => c.owner === o).length;
+  const total = conOwner.length;
+  const otros = cuenta("otro");
 
   return {
     posicionMarca: idx === -1 ? null : idx + 1,
-    totalMarca: conOwner.filter((c) => c.owner === "marca").length,
-    totalCompetencia: conOwner.filter((c) => c.owner === "competencia").length,
-    totalCreadores: conOwner.filter((c) => c.owner === "creador").length,
-    total: conOwner.length,
+    totalMarca: cuenta("marca"),
+    totalCompetencia: cuenta("competencia"),
+    totalCreadores: cuenta("creador"),
+    totalOtros: otros,
+    total,
     mejorCreador: porViews(conOwner.filter((c) => c.owner === "creador")),
     mejorCompetencia: porViews(conOwner.filter((c) => c.owner === "competencia")),
+    dominaElRuido: total > 0 && otros > total / 2,
   };
 }

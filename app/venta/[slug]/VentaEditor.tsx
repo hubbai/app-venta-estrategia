@@ -338,7 +338,8 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
               <div>
                 <span className="label">Resultados · de quién es cada uno</span>
                 <p className="mb-2 text-xs text-fg-faint">
-                  La slide afirma esto frente al cliente. Si algo está mal clasificado, corrígelo aquí.
+                  La slide afirma esto frente al cliente. Si algo está mal clasificado, corrígelo aquí.{" "}
+                  <b>Sin relación</b> es el que solo comparte la palabra: buscas Apple y sale una manzana.
                 </p>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                   {research.search!.results.map((c, i) => (
@@ -366,6 +367,7 @@ export default function VentaEditor({ project, initialResearch, initialDeck, eng
                           <option value="marca">Marca</option>
                           <option value="competencia">Competencia</option>
                           <option value="creador">Creador</option>
+                          <option value="otro">Sin relación</option>
                         </select>
                       </figcaption>
                     </figure>

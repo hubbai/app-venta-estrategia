@@ -24,7 +24,11 @@ export type Ad = {
 /* De quién es un video que salió en el buscador. Es la pregunta que abre la
    llamada, así que se guarda por resultado y se puede corregir a mano: la
    slide 1 afirma cosas sobre esto frente al cliente. */
-export type Owner = "marca" | "competencia" | "creador";
+/* "otro" es el que no habla de la marca: buscas Apple y salen manzanas
+   animadas. No se esconde, se etiqueta — que el buscador de tu marca esté
+   lleno de contenido ajeno ES el hallazgo, y contarlo como "creadores hablando
+   de ti" seria mentir en la llamada. */
+export type Owner = "marca" | "competencia" | "creador" | "otro";
 
 /* Un video, venga del perfil de la marca, del buscador o de un creador. */
 export type Clip = {

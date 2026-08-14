@@ -16,6 +16,7 @@ import {
 } from "./scrapecreators";
 import { mirror } from "../blob";
 import { clasificarResultados } from "../venta/owner";
+import { filtrarRuido } from "../venta/relevancia";
 import type { Ad, Clip, Profile, Research } from "../venta/types";
 
 type Sources = NonNullable<Research["sources"]>;
@@ -39,6 +40,8 @@ export type ScrapeInput = {
   searchQuery?: string;
   /* Nombres o handles de la competencia, para separarla de los creadores. */
   competitors?: string[];
+  /* Qué vende la marca: lo usa Claude para decidir si un video habla de ella. */
+  industry?: string;
 };
 
 export async function runScrape(input: ScrapeInput): Promise<Partial<Research>> {
@@ -58,10 +61,17 @@ export async function runScrape(input: ScrapeInput): Promise<Partial<Research>> 
 
   /* De quién es cada resultado del buscador. Es lo primero que se proyecta en
      la llamada, así que se etiqueta aquí y se puede corregir en el editor. */
-  const clasificados = clasificarResultados(search?.results ?? [], {
+  const porReglas = clasificarResultados(search?.results ?? [], {
     brand: input.brand,
     ownHandles: [input.tiktokHandle, input.instagramHandle, tt?.handle, ig?.handle],
     competitors: input.competitors,
+  });
+  /* Y aparte, lo que ninguna regla puede saber: si el video habla de la marca o
+     solo comparte la palabra ("Apple" trae manzanas animadas). */
+  const clasificados = await filtrarRuido(porReglas, {
+    brand: input.brand,
+    industry: input.industry,
+    query,
   });
   const creatorClips = clasificados.filter((c) => c.owner === "creador").slice(0, 2);
 

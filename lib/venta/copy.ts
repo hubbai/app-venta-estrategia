@@ -35,7 +35,7 @@ const DECK_SCHEMA = {
           type: "object",
           required: ["marca", "competencia", "creadores"],
           description:
-            "Una línea por pregunta, debajo del número que ya se ve en pantalla. NO repitas el número: di qué significa.",
+            "Una línea por pregunta, debajo del número que ya se ve en pantalla. NO repitas el número: di qué significa. UNA SOLA FRASE CORTA cada una — si te pasas del límite se corta a media palabra en la slide.",
           properties: {
             marca: {
               type: "string",
@@ -147,6 +147,7 @@ NARRATIVA SLIDE 1 (Buscador de TikTok) — ES LA SLIDE MÁS IMPORTANTE, LA QUE A
 - Si la competencia NO aparece: el ángulo es que el espacio está libre y se puede tomar primero, no que "nadie lo hace porque no sirve".
 - Si HAY creadores hablando de la marca: es la prueba más fuerte de todo el deck — pasó sin sistema, sin brief y sin pagarlo. Con Full Service eso deja de ser suerte.
 - Si NO hay creadores: el ángulo es que esos resultados hoy los llena contenido ajeno, y ahí es donde entra el mes 1.
+- SI LA MAYORÍA DE LOS RESULTADOS ESTÁN ETIQUETADOS [OTRO] (no hablan de la marca, solo comparten la palabra: buscas Apple y salen manzanas), ese es EL hallazgo de la slide y hay que decirlo tal cual: su nombre en TikTok todavía no les pertenece, lo ocupa contenido que no tiene nada que ver con lo que venden. NO los cuentes como creadores hablando de la marca ni cites sus views como prueba de nada. El ángulo es que el mes 1 empieza a llenar ese espacio con contenido que sí sea de la marca.
 - Si el buscador no se pudo leer, escribe los veredictos en términos de qué se va a revisar, sin inventar resultados.
 
 NARRATIVA SLIDE 2 (Paid Media / Ads Library):
@@ -227,6 +228,12 @@ function researchToPrompt(r: Research): string {
     v.totalCreadores > 0
       ? `Sí, ${v.totalCreadores} de ${v.total}${v.mejorCreador?.views ? `, y el mejor tiene ${v.mejorCreador.views} views` : ""}.`
       : "No hay creadores en los resultados."
+  }${
+    v.totalOtros > 0
+      ? `\n  · OJO: ${v.totalOtros} de ${v.total} resultados NO hablan de la marca (etiquetados [OTRO]): salieron solo porque comparten la palabra buscada.${
+          v.dominaElRuido ? " Son la MAYORÍA, así que ese es el hallazgo principal de la slide." : ""
+        }`
+      : ""
   }`
     : "No se pudo leer el buscador de TikTok.";
 

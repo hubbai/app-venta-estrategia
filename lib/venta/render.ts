@@ -25,6 +25,7 @@ const OWNER_LABEL: Record<Owner, string> = {
   marca: "Marca",
   competencia: "Competencia",
   creador: "Creador",
+  otro: "Sin relación",
 };
 
 function adCard(ad: Ad): string {
@@ -131,7 +132,10 @@ function veredictoCards(v: Veredictos, copy: Deck["buscador"]["veredictos"]): st
           ? v.mejorCreador?.views
             ? `de ${v.total}, el mejor con ${esc(v.mejorCreador.views)} views`
             : `de ${v.total} resultados`
-          : "todavía ninguno",
+          : v.totalOtros > 0
+            ? // Distinguir "nadie habla de ti" de "tu nombre trae otra cosa".
+              `${v.totalOtros} de ${v.total} ni siquiera son de tu categoría`
+            : "todavía ninguno",
       line: copy.creadores,
       tone: v.totalCreadores > 0 ? "good" : "flat",
     },
@@ -268,6 +272,12 @@ ${FONT_LINK}
   .sc.marca .own{background:#${C.goldDark};color:#${C.white}}
   .sc.competencia .own{background:#${C.ink};color:#${C.cream}}
   .sc.creador .own{background:#${C.greenBg};color:#${C.greenText}}
+  /* El ruido se apaga: gris y la miniatura al 55%. No se esconde —que el
+     buscador de tu marca esté lleno de contenido ajeno ES el hallazgo— pero
+     tiene que leerse distinto de un creador hablando de ti. */
+  .sc.otro .stb{opacity:.55}
+  .sc.otro .own{background:#${C.neutralBg};color:#${C.grayLight}}
+  .sc.otro figcaption b,.sc.otro figcaption span{color:#${C.grayLight}}
   .sc figcaption{margin-top:6px;text-align:center}
   .sc figcaption b{display:block;font-size:13px;font-weight:700;color:#${C.ink}}
   .sc figcaption span{display:block;font-size:10.5px;color:#${C.grayLight};overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

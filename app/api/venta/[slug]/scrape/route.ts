@@ -40,6 +40,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
       adPageId: body.adPageId ?? r.adPageId,
       searchQuery: body.searchQuery ?? r.search?.query ?? project.brand,
       competitors: r.competitors,
+      industry: r.industry,
     });
 
     /* Lo scrapeado gana sobre lo viejo, pero se conservan los campos que solo

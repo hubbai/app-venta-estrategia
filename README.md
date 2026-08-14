@@ -125,9 +125,23 @@ Un resultado del buscador es de la **marca**, de la **competencia** o de un
 - **Competencia** — coincide con la lista que escribes en el editor. No se
   adivina: otra marca y un creador son lo mismo vistos desde fuera.
 - **Creador** — todo lo demás.
+- **Sin relación** — el video no habla de la marca: solo comparte la palabra.
+  Buscar "Apple" devuelve manzanas animadas; "Resilient", videos de motivación.
+  Esto no lo puede decidir una regla de texto, así que lo juzga Claude
+  ([lib/venta/relevancia.ts](lib/venta/relevancia.ts)).
 
 Marcas de menos de 5 letras no aplican la regla de "contiene": daría falsos
 positivos por todos lados.
+
+Claude solo puede **bajar** un resultado de "creador" a "sin relación", nunca
+tocar lo que las reglas marcaron como marca o competencia. Así el peor caso de
+un modelo equivocado es un creador de menos en la cuenta, y nunca una cuenta de
+la marca presentada como creador externo. Ante la duda deja pasar el video.
+
+El ruido **no se esconde: se etiqueta y se apaga**. Que el buscador de tu marca
+esté lleno de contenido ajeno *es* el hallazgo —tu nombre ahí todavía no es
+tuyo—, y contarlo como "creadores hablando de ti" sería mentir en la llamada.
+Cuando la mayoría de los resultados son ruido, el copy cambia de ángulo solo.
 
 ## Flujo: estrategia
 
