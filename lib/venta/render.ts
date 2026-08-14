@@ -180,7 +180,12 @@ ${FONT_LINK}
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;background:#${C.ink};font-family:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,Arial,sans-serif;-webkit-font-smoothing:antialiased}
   #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
-  #deck{width:1280px;height:720px;transform-origin:center center;position:relative}
+  /* flex:none NO es opcional. #stage es flex, así que sin esto el navegador
+     encoge #deck para que quepa en pantallas angostas (un iframe de editor, un
+     celular). Las slides son absolute con width:1280px, así que se salen de un
+     #deck encogido y el escalado las corre de lugar: se ve una franja negra a
+     la izquierda y la slide cortada a la derecha. */
+  #deck{flex:none;width:1280px;height:720px;transform-origin:center center;position:relative}
   .slide{position:absolute;inset:0;width:1280px;height:720px;background:#${C.cream};color:#${C.ink};
          padding:46px 60px 62px;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .28s ease}
   .slide.on{opacity:1;pointer-events:auto}
